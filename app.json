@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "hooked.",
+    "name": "Hooked",
     "slug": "hooked-music",
     "scheme": "hooked",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,6 +14,7 @@
     },
     "android": {
       "package": "com.minus.hooked",
+      "versionCode": 2,
       "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#08080C",
