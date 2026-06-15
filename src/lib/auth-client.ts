@@ -3,9 +3,10 @@ import type { BetterAuthClientPlugin } from "better-auth";
 import { convexClient } from "@convex-dev/better-auth/client/plugins";
 import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
+import { CONVEX_SITE_URL } from "../config/env";
 
 export const authClient = createAuthClient({
-  baseURL: process.env.EXPO_PUBLIC_CONVEX_SITE_URL,
+  baseURL: CONVEX_SITE_URL,
   plugins: [
     convexClient(),
     // cast: minor type-level skew between better-auth 1.6.x and the Expo

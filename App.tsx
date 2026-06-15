@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -46,12 +46,13 @@ import {
 } from "./src/types";
 import { art } from "./src/lib/art";
 import { BUILD_TAG } from "./src/buildInfo";
+import { CONVEX_URL } from "./src/config/env";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
+const ANON_SWIPES_KEY = "hooked.anonSwipes.v1";
+const FREE_SWIPES = 5;
 
-const convex = new ConvexReactClient(
-  process.env.EXPO_PUBLIC_CONVEX_URL as string,
-);
+const convex = new ConvexReactClient(CONVEX_URL);
 
 type Screen = "home" | "discover" | "profile" | "settings" | `library:${string}`;
 
@@ -127,10 +128,14 @@ function Shell() {
   const [saveSheetOpen, setSaveSheetOpen] = useState(false);
   const [newPlaylistOpen, setNewPlaylistOpen] = useState(false);
   const [fullSongOpen, setFullSongOpen] = useState(false);
+  const anonSwipeCount = useRef(0);
 
   useEffect(() => {
     void setAudioModeAsync({ playsInSilentMode: true });
     void AsyncStorage.getItem(ONBOARD_KEY).then((v) => setOnboarded(v === "1"));
+    void AsyncStorage.getItem(ANON_SWIPES_KEY).then((v) => {
+      anonSwipeCount.current = Number(v) || 0;
+    });
   }, []);
 
   // ----- cloud sync (ported from web/src/App.tsx) -----
@@ -151,6 +156,20 @@ function Shell() {
   useEffect(() => {
     if (signedIn) void ensureProfile({}).catch(() => undefined);
   }, [signedIn, ensureProfile]);
+
+  useEffect(() => {
+    if (signedIn) {
+      anonSwipeCount.current = 0;
+      void AsyncStorage.removeItem(ANON_SWIPES_KEY);
+    }
+  }, [signedIn]);
+
+  const promptAuth = useCallback((message: string) => {
+    Alert.alert("Create an account", message, [
+      { text: "Not now", style: "cancel" },
+      { text: "Sign in", onPress: () => setScreen("profile") },
+    ]);
+  }, []);
 
   // hydrate the local store from the cloud library ONCE per signed-in user —
   // keyed by user id, NOT by query nullability: a transient null frame from
@@ -227,6 +246,18 @@ function Shell() {
       lastSwipeAt.current = Date.now();
       const track = onDeck;
       const action = DIR_TO_ACTION[dir];
+      if (!signedIn) {
+        if (action === "save") {
+          promptAuth("Create an account to save songs and playlists across devices.");
+          return;
+        }
+        if (anonSwipeCount.current >= FREE_SWIPES) {
+          promptAuth("You've used your 5 free swipes. Sign in to keep discovering and sync your taste.");
+          return;
+        }
+        anonSwipeCount.current += 1;
+        void AsyncStorage.setItem(ANON_SWIPES_KEY, String(anonSwipeCount.current));
+      }
       swipe(action);
       if (signedIn && track) {
         void recordSwipe({ track: toServer(track), action }).catch(
@@ -234,7 +265,7 @@ function Shell() {
         );
       }
     },
-    [swipe, onDeck, signedIn, recordSwipe],
+    [swipe, onDeck, signedIn, recordSwipe, promptAuth],
   );
 
   // bumping this cancels any in-flight save animation in the deck — going

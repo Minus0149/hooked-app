@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -9,6 +9,7 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 import { useStore } from "../state/store";
 import { colors, fonts, radii } from "../design/tokens";
+import { SITE_URL, WEB_APP_URL } from "../config/env";
 
 /** Animated track+knob switch matching web's .toggle — save-green when on. */
 function Toggle({ on }: { on: boolean }) {
@@ -131,6 +132,28 @@ export function SettingsScreen({
         />
 
         <Text style={styles.group}>app</Text>
+        <Row
+          icon="external-link"
+          iconColor={colors.more}
+          label="Website"
+          sub={SITE_URL.replace(/^https?:\/\//, "")}
+          onPress={() =>
+            void Linking.openURL(SITE_URL).catch(() => {
+              Alert.alert("Could not open website", SITE_URL);
+            })
+          }
+        />
+        <Row
+          icon="globe"
+          iconColor={colors.accentDefault}
+          label="Web app"
+          sub={WEB_APP_URL.replace(/^https?:\/\//, "")}
+          onPress={() =>
+            void Linking.openURL(WEB_APP_URL).catch(() => {
+              Alert.alert("Could not open web app", WEB_APP_URL);
+            })
+          }
+        />
         <Row
           icon="rotate-ccw"
           label="Replay the swipe tutorial"
