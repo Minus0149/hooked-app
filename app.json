@@ -4,6 +4,7 @@
     "slug": "hooked-music",
     "scheme": "hooked",
     "version": "1.0.0",
+    "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -13,7 +14,7 @@
     },
     "android": {
       "package": "com.minus.hooked",
-      "usesCleartextTraffic": true,
+      "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#08080C",
         "foregroundImage": "./assets/android-icon-foreground.png",
