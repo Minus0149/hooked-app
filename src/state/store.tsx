@@ -11,7 +11,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Playlist, SaveTarget, SwipeAction, Track } from "../types";
 import catalogJson from "../data/catalog.json";
 
-const CATALOG = catalogJson as Track[];
+/**
+ * Songs shipped inside the app binary. They are the offline deck and what a
+ * cold start plays; the real catalogue lives in Convex and replaces this as
+ * soon as tracks.list answers, which is also the only way hooks, creator
+ * uploads and imported songs ever reach a card.
+ */
+const BAKED = catalogJson as Track[];
 const PERSIST_KEY = "hooked.library.v2";
 const LEGACY_KEY = "hooked.library.v1";
 
@@ -34,6 +40,15 @@ export interface AppState {
   saveTarget: SaveTarget;
   autoAdvance: boolean; // keep playing the next song when a preview ends
   hydrated: boolean;
+  // every track the deck may deal, carrying its hooks. Starts as the baked
+  // list and is replaced by the server's.
+  catalog: Track[];
+  // ids the server still serves; null until tracks.list has answered
+  allowedIds: string[] | null;
+  // songs buried with a left swipe; never re-dealt, ever
+  neverTracks: string[];
+  // containers whose songs may come round again ("liked" | "discoveries" | "pl:<id>")
+  replayContainers: string[];
 }
 
 type Persisted = Partial<
@@ -55,6 +70,7 @@ type Action =
   | { type: "JUMP_TO"; trackId: string }
   | { type: "SET_SAVE_TARGET"; target: SaveTarget }
   | { type: "SET_AUTO_ADVANCE"; value: boolean }
+  | { type: "SET_REPLAY"; container: string; allow: boolean }
   | { type: "CREATE_PLAYLIST"; playlist: Playlist }
   | { type: "DELETE_PLAYLIST"; id: string }
   | { type: "REMOVE_SONG"; trackId: string }
@@ -66,7 +82,15 @@ type Action =
       discoveries: Track[];
       playlists: Playlist[];
       neverArtists: string[];
+      neverTracks: string[];
+      replayContainers: string[];
       saveTarget: SaveTarget;
+    }
+  | {
+      // the server catalogue arrived: it replaces the baked one wholesale,
+      // which is what brings hooks and creator tracks into the deck
+      type: "APPLY_CATALOG";
+      tracks: Track[];
     }
   | { type: "RESET" };
 
@@ -79,14 +103,38 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildQueue(exclude: Set<string>, neverArtists: string[]): Track[] {
-  const fresh = CATALOG.filter(
+function buildQueue(catalog: Track[], exclude: Set<string>, neverArtists: string[]): Track[] {
+  const fresh = catalog.filter(
     (t) => !exclude.has(t.id) && !neverArtists.includes(t.artist),
   );
   // If the user has heard everything, loop the catalog rather than dead-ending
   const pool =
-    fresh.length > 4 ? fresh : CATALOG.filter((t) => !neverArtists.includes(t.artist));
+    fresh.length > 4 ? fresh : catalog.filter((t) => !neverArtists.includes(t.artist));
   return shuffle(pool);
+}
+
+/**
+ * Everything the deck must not deal again.
+ *
+ * Buried songs are absolute. Saved songs are excluded per container, because
+ * "I saved this" usually means "stop showing me it" but not always — a playlist
+ * someone treats as a rotation should keep coming round.
+ */
+function blockedIds(
+  state: Pick<
+    AppState,
+    "liked" | "discoveries" | "playlists" | "neverTracks" | "replayContainers"
+  >,
+): Set<string> {
+  const allow = new Set(state.replayContainers);
+  const blocked = new Set(state.neverTracks);
+  if (!allow.has("liked")) for (const t of state.liked) blocked.add(t.id);
+  if (!allow.has("discoveries")) for (const t of state.discoveries) blocked.add(t.id);
+  for (const p of state.playlists) {
+    if (allow.has(`pl:${p.id}`)) continue;
+    for (const t of p.tracks) blocked.add(t.id);
+  }
+  return blocked;
 }
 
 function libraryIds(state: Pick<AppState, "liked" | "discoveries" | "playlists">) {
@@ -130,7 +178,11 @@ function spreadAlbums(tracks: Track[]): Track[] {
 }
 
 const initialState: AppState = {
-  queue: buildQueue(new Set(), []),
+  catalog: BAKED,
+  allowedIds: null,
+  neverTracks: [],
+  replayContainers: [],
+  queue: buildQueue(BAKED, new Set(), []),
   history: [],
   liked: [],
   discoveries: [],
@@ -165,12 +217,12 @@ function reducer(state: AppState, action: Action): AppState {
       const inLibrary = libraryIds(merged);
       return {
         ...merged,
-        queue: spreadAlbums(buildQueue(inLibrary, merged.neverArtists)),
+        queue: spreadAlbums(buildQueue(state.catalog, inLibrary, merged.neverArtists)),
       };
     }
 
     case "HYDRATE_REMOTE": {
-      const inLibrary = libraryIds(action);
+      const inLibrary = blockedIds(action);
       // keep the card the user is looking at — yanking queue[0] mid-session
       // swaps the visible card/audio under their thumb
       const [head, ...restQ] = state.queue;
@@ -184,14 +236,18 @@ function reducer(state: AppState, action: Action): AppState {
       // (SWIPE's refill is unreachable with an empty queue) — top it up here
       if (queue.length < 3) {
         const queued = new Set(queue.map((t) => t.id));
-        const fresh = CATALOG.filter(
+        const fresh = state.catalog.filter(
           (t) =>
             !inLibrary.has(t.id) &&
             !action.neverArtists.includes(t.artist) &&
             !queued.has(t.id),
         );
-        const fallback = CATALOG.filter(
-          (t) => !action.neverArtists.includes(t.artist) && !queued.has(t.id),
+        // the relaxed pool gives up on freshness, never on what they buried
+        const fallback = state.catalog.filter(
+          (t) =>
+            !action.neverTracks.includes(t.id) &&
+            !action.neverArtists.includes(t.artist) &&
+            !queued.has(t.id),
         );
         queue = [...queue, ...shuffle(fresh.length >= 3 ? fresh : fallback)];
       }
@@ -201,6 +257,8 @@ function reducer(state: AppState, action: Action): AppState {
         discoveries: uniqueById(action.discoveries),
         playlists: action.playlists.map((p) => ({ ...p, tracks: uniqueById(p.tracks) })),
         neverArtists: action.neverArtists,
+        neverTracks: action.neverTracks,
+        replayContainers: action.replayContainers,
         saveTarget: action.saveTarget,
         queue: spreadAlbums(uniqueById(queue)),
         hydrated: true,
@@ -208,10 +266,41 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    case "APPLY_CATALOG": {
+      const ids = action.tracks.map((t) => t.id);
+      // tracks.list is reactive; returning a fresh object on every re-fire
+      // would feed the render loop. Same ids in the same order means no work.
+      const sameIds =
+        state.allowedIds !== null &&
+        state.allowedIds.length === ids.length &&
+        state.allowedIds.every((id, i) => id === ids[i]);
+      if (sameIds) return state;
+
+      // Keep the card being looked at if the server still carries it, and
+      // rebuild the rest. Filtering the old queue instead would empty the deck
+      // whenever the server list isn't a superset of the baked one.
+      const head = state.queue[0];
+      const allowed = new Set(ids);
+      const keepHead = head && allowed.has(head.id) ? head : null;
+      const exclude = libraryIds(state);
+      if (keepHead) exclude.add(keepHead.id);
+
+      const rest = buildQueue(action.tracks, exclude, state.neverArtists);
+      return {
+        ...state,
+        catalog: action.tracks,
+        allowedIds: ids,
+        queue: spreadAlbums(uniqueById(keepHead ? [keepHead, ...rest] : rest)),
+      };
+    }
+
     case "RESET":
       return {
         ...initialState,
-        queue: buildQueue(new Set(), []),
+        // a reset clears the user's data, not the catalogue we already fetched
+        catalog: state.catalog,
+        allowedIds: state.allowedIds,
+        queue: buildQueue(state.catalog, new Set(), []),
         hydrated: true,
       };
 
@@ -219,7 +308,7 @@ function reducer(state: AppState, action: Action): AppState {
       const current = state.queue[0];
       if (!current) return state;
       let rest = state.queue.slice(1);
-      let { liked, discoveries, playlists, neverArtists, boostGenres } = state;
+      let { liked, discoveries, playlists, neverArtists, neverTracks, boostGenres } = state;
 
       const savedToLibrary =
         action.action === "save" && !libraryIds(state).has(current.id);
@@ -262,6 +351,11 @@ function reducer(state: AppState, action: Action): AppState {
         neverArtists = neverArtists.includes(current.artist)
           ? neverArtists
           : [...neverArtists, current.artist];
+        // bury the song too. The artist block is the broader promise and can be
+        // lifted; "never play this one again" should survive that.
+        neverTracks = neverTracks.includes(current.id)
+          ? neverTracks
+          : [...neverTracks, current.id];
         rest = rest.filter((t) => t.artist !== current.artist);
       }
       // top up BEFORE the queue runs dry (the deck shows 3 cards), and never
@@ -269,26 +363,26 @@ function reducer(state: AppState, action: Action): AppState {
       // recently seen songs — re-dealing the same card right back was the
       // "old image appears again" glitch (and, with ↩, duplicate queue ids)
       if (rest.length < 3) {
-        const inLibrary = libraryIds({ liked, discoveries, playlists });
+        const blocked = blockedIds({
+          liked,
+          discoveries,
+          playlists,
+          neverTracks,
+          replayContainers: state.replayContainers,
+        });
         const avoid = new Set([
           current.id,
           ...rest.map((t) => t.id),
           ...state.history.slice(-12).map((h) => h.track.id),
         ]);
-        const fresh = CATALOG.filter(
-          (t) =>
-            !inLibrary.has(t.id) &&
-            !neverArtists.includes(t.artist) &&
-            !avoid.has(t.id),
+        // Never reach for a song the listener buried or already keeps. The old
+        // fallbacks dropped that filter when fresh material ran short, which is
+        // why saved songs came back. Running low relaxes *recency*, not this.
+        const pickable = state.catalog.filter(
+          (t) => !blocked.has(t.id) && !neverArtists.includes(t.artist),
         );
-        const seenAgain = CATALOG.filter(
-          (t) => !neverArtists.includes(t.artist) && !avoid.has(t.id),
-        );
-        const lastResort = CATALOG.filter(
-          (t) => t.id !== current.id && !neverArtists.includes(t.artist),
-        );
-        const pool =
-          fresh.length >= 3 ? fresh : seenAgain.length > 0 ? seenAgain : lastResort;
+        const fresh = pickable.filter((t) => !avoid.has(t.id));
+        const pool = fresh.length >= 3 ? fresh : pickable.filter((t) => t.id !== current.id);
         rest = [...rest, ...shuffle(pool)];
       }
       return {
@@ -302,6 +396,7 @@ function reducer(state: AppState, action: Action): AppState {
         discoveries,
         playlists,
         neverArtists,
+        neverTracks,
         boostGenres,
       };
     }
@@ -359,13 +454,20 @@ function reducer(state: AppState, action: Action): AppState {
         })),
       };
 
+    case "SET_REPLAY": {
+      const allow = new Set(state.replayContainers);
+      if (action.allow) allow.add(action.container);
+      else allow.delete(action.container);
+      return { ...state, replayContainers: [...allow] };
+    }
+
     case "SET_AUTO_ADVANCE":
       return { ...state, autoAdvance: action.value };
 
     case "JUMP_TO": {
       const target =
         state.queue.find((t) => t.id === action.trackId) ??
-        CATALOG.find((t) => t.id === action.trackId);
+        state.catalog.find((t) => t.id === action.trackId);
       if (!target) return state;
       return {
         ...state,
@@ -388,14 +490,18 @@ interface StoreValue {
   deletePlaylist: (id: string) => void;
   removeSong: (trackId: string) => void;
   setAutoAdvance: (value: boolean) => void;
+  setReplay: (container: string, allow: boolean) => void;
   hydrateRemote: (payload: {
     liked: Track[];
     discoveries: Track[];
     playlists: Playlist[];
     neverArtists: string[];
+    neverTracks: string[];
+    replayContainers: string[];
     saveTarget: SaveTarget;
   }) => void;
   resetLocal: () => void;
+  applyCatalog: (tracks: Track[]) => void;
   catalog: Track[];
 }
 
@@ -463,6 +569,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       swipe: (action: SwipeAction) => dispatch({ type: "SWIPE", action }),
       back: () => dispatch({ type: "BACK" }),
       jumpTo: (trackId: string) => dispatch({ type: "JUMP_TO", trackId }),
+      applyCatalog: (tracks: Track[]) => dispatch({ type: "APPLY_CATALOG", tracks }),
+      setReplay: (container: string, allow: boolean) =>
+        dispatch({ type: "SET_REPLAY", container, allow }),
       setSaveTarget: (target: SaveTarget) => dispatch({ type: "SET_SAVE_TARGET", target }),
       createPlaylist: (playlist: Playlist) => dispatch({ type: "CREATE_PLAYLIST", playlist }),
       deletePlaylist: (id: string) => dispatch({ type: "DELETE_PLAYLIST", id }),
@@ -473,6 +582,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         discoveries: Track[];
         playlists: Playlist[];
         neverArtists: string[];
+        neverTracks: string[];
+        replayContainers: string[];
         saveTarget: SaveTarget;
       }) => dispatch({ type: "HYDRATE_REMOTE", ...payload }),
       resetLocal: () => {
@@ -484,7 +595,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(
-    () => ({ state, ...actions, catalog: CATALOG }),
+    () => ({ state, ...actions, catalog: state.catalog }),
     [state, actions],
   );
 

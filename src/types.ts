@@ -1,3 +1,14 @@
+/**
+ * A window into a track's audio. A 30-second preview holds three of them; a
+ * full upload holds as many as the artist marks.
+ */
+export interface HookWindow {
+  id: string;
+  startMs: number;
+  durationMs: number;
+  label?: string;
+}
+
 export interface Track {
   id: string;
   title: string;
@@ -8,6 +19,10 @@ export interface Track {
   durationMs: number;
   genre: string;
   accent: string;
+  /** full audio uploaded by the rights holder, when there is one */
+  audioUrl?: string;
+  /** ordered best-first by the server; absent means "play the whole preview" */
+  hooks?: HookWindow[];
 }
 
 export type SwipeAction = "skip" | "save" | "more" | "never";

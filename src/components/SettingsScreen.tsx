@@ -75,11 +75,17 @@ export function SettingsScreen({
   onOpenSaveTarget,
   onReplayTutorial,
   onResetData,
+  signedIn,
+  onDeleteAccount,
+  onReplay,
 }: {
   onBack: () => void;
   onOpenSaveTarget: () => void;
   onReplayTutorial: () => void;
   onResetData: () => void;
+  signedIn: boolean;
+  onDeleteAccount: () => void;
+  onReplay: (container: string, allow: boolean) => void;
 }) {
   const { state, setAutoAdvance } = useStore();
 
@@ -131,6 +137,44 @@ export function SettingsScreen({
           onPress={() => setAutoAdvance(!state.autoAdvance)}
         />
 
+        <Text style={styles.group}>what comes back</Text>
+        <Text style={styles.note}>
+          Saving a song normally takes it out of the deck. Turn a list back on if
+          you treat it as a rotation rather than an archive. Songs you swiped
+          left on stay gone either way.
+        </Text>
+        {[
+          { id: "liked", name: "Liked Songs", count: state.liked.length },
+          { id: "discoveries", name: "Discoveries", count: state.discoveries.length },
+          ...state.playlists.map((p) => ({
+            id: `pl:${p.id}`,
+            name: p.name,
+            count: p.tracks.length,
+          })),
+        ].map((container) => {
+          const on = state.replayContainers.includes(container.id);
+          return (
+            <Row
+              key={container.id}
+              icon="repeat"
+              iconColor={colors.save}
+              label={container.name}
+              sub={`${container.count} song${container.count === 1 ? "" : "s"} · ${
+                on ? "can come round again" : "kept out of the deck"
+              }`}
+              right={<Toggle on={on} />}
+              onPress={() => onReplay(container.id, !on)}
+            />
+          );
+        })}
+        {state.neverTracks.length > 0 && (
+          <Text style={styles.note}>
+            {state.neverTracks.length} song
+            {state.neverTracks.length === 1 ? "" : "s"} buried with a left swipe.
+            Those never come back.
+          </Text>
+        )}
+
         <Text style={styles.group}>app</Text>
         <Row
           icon="external-link"
@@ -151,6 +195,16 @@ export function SettingsScreen({
           onPress={() =>
             void Linking.openURL(WEB_APP_URL).catch(() => {
               Alert.alert("Could not open web app", WEB_APP_URL);
+            })
+          }
+        />
+        <Row
+          icon="shield"
+          label="Privacy & terms"
+          sub="how your listening data is handled"
+          onPress={() =>
+            void Linking.openURL(`${SITE_URL}/privacy`).catch(() => {
+              Alert.alert("Could not open the privacy policy", `${SITE_URL}/privacy`);
             })
           }
         />
@@ -177,12 +231,45 @@ export function SettingsScreen({
             )
           }
         />
+        {signedIn && (
+          <>
+            <Text style={styles.group}>account</Text>
+            <Row
+              icon="trash-2"
+              iconColor={colors.never}
+              label="Delete my account"
+              labelColor={colors.never}
+              sub="removes your account and everything saved to it, for good"
+              onPress={() =>
+                Alert.alert(
+                  "Delete your account?",
+                  "Your profile, swipes, library and playlists are erased. This cannot be undone.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: onDeleteAccount,
+                    },
+                  ],
+                )
+              }
+            />
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  note: {
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: colors.muted,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+  },
   screen: { flex: 1 },
   topbar: {
     flexDirection: "row",

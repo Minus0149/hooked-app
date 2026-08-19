@@ -197,6 +197,9 @@ export function SwipeDeck({
   onOpenFullSong,
   onSwipeStart,
   onSwipe,
+  hookIndex,
+  hookCount,
+  onNextHook,
 }: {
   tracks: Track[]; // [onDeck, next, nextNext]
   backToken: number; // bumped by ↩ — cancels any in-flight save FX
@@ -210,6 +213,9 @@ export function SwipeDeck({
   onOpenFullSong: () => void;
   onSwipeStart: () => void; // gesture committed — arm interaction guards NOW
   onSwipe: (dir: SwipeDir) => void;
+  hookIndex: number; // which window of the song is playing
+  hookCount: number; // 1 means the track has no hooks marked
+  onNextHook: () => void;
 }) {
   const [onDeck, next, nextNext] = tracks;
 
@@ -421,6 +427,17 @@ export function SwipeDeck({
   // whichever DeckCard currently holds the top role
   const chrome = onDeck ? (
     <>
+      <HookDots count={hookCount} index={hookIndex} progress={progress} />
+      {hookCount > 1 && (
+        <Pressable
+          style={styles.hookTap}
+          onPress={onNextHook}
+          accessibilityRole="button"
+          accessibilityLabel={`next hook, ${hookIndex + 1} of ${hookCount}`}
+        >
+          <Text style={styles.hookTapLabel}>next hook</Text>
+        </Pressable>
+      )}
       <Animated.View
         style={[styles.stamp, styles.stampUp, { borderColor: STAMP.up.color }, upStamp]}
       >
@@ -626,6 +643,48 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 18 },
     elevation: 16,
   },
+  // one segment per hook, sitting above the artwork
+  hookDots: {
+    position: "absolute",
+    top: 10,
+    left: 12,
+    right: 12,
+    zIndex: 6,
+    flexDirection: "row",
+    gap: 4,
+  },
+  hookDot: {
+    flex: 1,
+    height: 3,
+    borderRadius: 3,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.28)",
+  },
+  hookDotFill: { height: "100%", borderRadius: 3, backgroundColor: "#fff" },
+  // Tap target for jumping windows. Kept clear of the scrubber and the action
+  // row at the bottom, and it never blocks the swipe gesture.
+  hookTap: {
+    position: "absolute",
+    top: 26,
+    left: 0,
+    right: 0,
+    bottom: 96,
+    zIndex: 4,
+    alignItems: "flex-end",
+  },
+  hookTapLabel: {
+    marginTop: 8,
+    marginRight: 12,
+    fontSize: 10.5,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.75)",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
   behind: { transform: [{ scale: 0.94 }, { translateY: 14 }], opacity: 0.55 },
   behind2: { transform: [{ scale: 0.88 }, { translateY: 26 }], opacity: 0.3 },
   art: { ...absFill, width: undefined, height: undefined },
@@ -805,3 +864,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+
+/**
+ * Stories-style segmented bars, one per window.
+ *
+ * Windows behind the current one read as full, the one playing fills as it
+ * runs, the rest sit empty. A single window renders nothing — a lone full-width
+ * bar would just be noise on a track nobody has marked hooks in.
+ */
+function HookDots({
+  count,
+  index,
+  progress,
+}: {
+  count: number;
+  index: number;
+  progress: number;
+}) {
+  if (count < 2) return null;
+  return (
+    <View style={styles.hookDots} pointerEvents="none">
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={styles.hookDot}>
+          <View
+            style={[
+              styles.hookDotFill,
+              { width: `${(i < index ? 1 : i === index ? progress : 0) * 100}%` },
+            ]}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
