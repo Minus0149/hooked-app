@@ -31,6 +31,7 @@ import { hooksOf, sourceOf, windowTiming } from "./src/lib/hooks";
 import { HomeScreen } from "./src/components/HomeScreen";
 import { LibraryScreen } from "./src/components/LibraryScreen";
 import { SettingsScreen } from "./src/components/SettingsScreen";
+import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { ProfileScreen } from "./src/components/ProfileScreen";
 import { Onboarding } from "./src/components/Onboarding";
 import { BottomNav } from "./src/components/BottomNav";
@@ -139,6 +140,7 @@ function Shell() {
     resetLocal,
     applyCatalog,
     setReplay,
+    unbury,
   } = useStore();
   const [screen, setScreen] = useState<Screen>("home");
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
@@ -178,6 +180,7 @@ function Shell() {
   const removeSongMutation = useMutation(anyApi.library.removeSong);
   const deleteAccountMutation = useMutation(anyApi.library.deleteMyAccount);
   const setReplayMutation = useMutation(anyApi.library.setReplayContainer);
+  const unburyMutation = useMutation(anyApi.library.unburyTrack);
 
   useEffect(() => {
     if (serverTracks && serverTracks.length > 0) {
@@ -249,6 +252,14 @@ function Shell() {
       }
     },
     [setReplay, signedIn, setReplayMutation],
+  );
+
+  const handleUnbury = useCallback(
+    (trackId: string) => {
+      unbury(trackId);
+      if (signedIn) void unburyMutation({ trackId }).catch(() => undefined);
+    },
+    [unbury, signedIn, unburyMutation],
   );
 
   const promptAuth = useCallback((message: string) => {
@@ -361,6 +372,22 @@ function Shell() {
   const handleNextHook = useCallback(() => {
     advanceHook(false);
   }, [advanceHook]);
+
+  /**
+   * Dead audio must not park the deck.
+   *
+   * Preview URLs rotate and expire — with a curated hundred that never
+   * happened, with a thousand off the charts it will. expo-audio reports it on
+   * status.error and then nothing else moves: no currentTime, no didJustFinish,
+   * so the auto-advance never runs and the card just sits there silent. Treat
+   * it as the song being over.
+   */
+  useEffect(() => {
+    if (!inDiscover || !status.error) return;
+    if (Date.now() - lastSwipeAt.current < 700) return;
+    lastSwipeAt.current = Date.now();
+    swipe("skip");
+  }, [status.error, inDiscover]);
 
   // A window running out moves to the next hook; the *last* window running out
   // is what "the song ended" now means. Skip still skips the song, so all four
@@ -713,6 +740,7 @@ function Shell() {
           signedIn={signedIn}
           onDeleteAccount={handleDeleteAccount}
           onReplay={handleReplay}
+          onUnbury={handleUnbury}
         />
       )}
 
@@ -778,9 +806,12 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ConvexBetterAuthProvider client={convex} authClient={authClient}>
-          <StoreProvider>
-            <Shell />
-          </StoreProvider>
+          {/* inside the providers, so recovering keeps the session and store */}
+          <AppErrorBoundary>
+            <StoreProvider>
+              <Shell />
+            </StoreProvider>
+          </AppErrorBoundary>
         </ConvexBetterAuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

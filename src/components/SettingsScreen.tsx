@@ -55,6 +55,10 @@ function Row({
     <Pressable
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
       onPress={onPress}
+      accessibilityRole="button"
+      // the icon carries meaning visually and nothing to a screen reader, so
+      // the label has to say what the row is and what state it's in
+      accessibilityLabel={sub ? `${label}. ${sub}` : label}
     >
       <View style={styles.rowIcon}>
         <Feather name={icon} size={17} color={iconColor ?? colors.text} />
@@ -78,6 +82,7 @@ export function SettingsScreen({
   signedIn,
   onDeleteAccount,
   onReplay,
+  onUnbury,
 }: {
   onBack: () => void;
   onOpenSaveTarget: () => void;
@@ -86,6 +91,7 @@ export function SettingsScreen({
   signedIn: boolean;
   onDeleteAccount: () => void;
   onReplay: (container: string, allow: boolean) => void;
+  onUnbury: (trackId: string) => void;
 }) {
   const { state, setAutoAdvance } = useStore();
 
@@ -168,11 +174,28 @@ export function SettingsScreen({
           );
         })}
         {state.neverTracks.length > 0 && (
-          <Text style={styles.note}>
-            {state.neverTracks.length} song
-            {state.neverTracks.length === 1 ? "" : "s"} buried with a left swipe.
-            Those never come back.
-          </Text>
+          <>
+            <Text style={styles.note}>
+              {state.neverTracks.length} song
+              {state.neverTracks.length === 1 ? "" : "s"} buried with a left
+              swipe. They never come back on their own — dig one out if you
+              changed your mind.
+            </Text>
+            {state.neverTracks.map((id) => {
+              const t = state.catalog.find((c) => c.id === id);
+              return (
+                <Row
+                  key={id}
+                  icon="x"
+                  iconColor={colors.never}
+                  label={t ? t.title : "a song no longer in the catalogue"}
+                  sub={t ? t.artist : id}
+                  right={<Text style={styles.note}>dig out</Text>}
+                  onPress={() => onUnbury(id)}
+                />
+              );
+            })}
+          </>
         )}
 
         <Text style={styles.group}>app</Text>

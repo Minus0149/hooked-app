@@ -63,6 +63,9 @@ function NavButton({
     <Pressable
       style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.8 }]}
       onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
     >
       <Feather name={icon} size={22} color={active ? accent : colors.muted} />
       <Text style={[styles.navLabel, active && { color: colors.text }]}>{label}</Text>
