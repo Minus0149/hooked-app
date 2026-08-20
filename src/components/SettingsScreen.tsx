@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
+import { ReplayRules } from "./ReplayRules";
 import { useStore } from "../state/store";
 import { colors, fonts, radii } from "../design/tokens";
 import { SITE_URL, WEB_APP_URL } from "../config/env";
@@ -143,60 +144,7 @@ export function SettingsScreen({
           onPress={() => setAutoAdvance(!state.autoAdvance)}
         />
 
-        <Text style={styles.group}>what comes back</Text>
-        <Text style={styles.note}>
-          Saving a song normally takes it out of the deck. Turn a list back on if
-          you treat it as a rotation rather than an archive. Songs you swiped
-          left on stay gone either way.
-        </Text>
-        {[
-          { id: "liked", name: "Liked Songs", count: state.liked.length },
-          { id: "discoveries", name: "Discoveries", count: state.discoveries.length },
-          ...state.playlists.map((p) => ({
-            id: `pl:${p.id}`,
-            name: p.name,
-            count: p.tracks.length,
-          })),
-        ].map((container) => {
-          const on = state.replayContainers.includes(container.id);
-          return (
-            <Row
-              key={container.id}
-              icon="repeat"
-              iconColor={colors.save}
-              label={container.name}
-              sub={`${container.count} song${container.count === 1 ? "" : "s"} · ${
-                on ? "can come round again" : "kept out of the deck"
-              }`}
-              right={<Toggle on={on} />}
-              onPress={() => onReplay(container.id, !on)}
-            />
-          );
-        })}
-        {state.neverTracks.length > 0 && (
-          <>
-            <Text style={styles.note}>
-              {state.neverTracks.length} song
-              {state.neverTracks.length === 1 ? "" : "s"} buried with a left
-              swipe. They never come back on their own — dig one out if you
-              changed your mind.
-            </Text>
-            {state.neverTracks.map((id) => {
-              const t = state.catalog.find((c) => c.id === id);
-              return (
-                <Row
-                  key={id}
-                  icon="x"
-                  iconColor={colors.never}
-                  label={t ? t.title : "a song no longer in the catalogue"}
-                  sub={t ? t.artist : id}
-                  right={<Text style={styles.note}>dig out</Text>}
-                  onPress={() => onUnbury(id)}
-                />
-              );
-            })}
-          </>
-        )}
+        <ReplayRules onReplay={onReplay} onUnbury={onUnbury} />
 
         <Text style={styles.group}>app</Text>
         <Row
