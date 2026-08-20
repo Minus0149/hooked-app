@@ -24,6 +24,7 @@ import {
 import { ConvexReactClient, useMutation, useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { coerceTaste } from "./src/data/taste";
 import { authClient } from "./src/lib/auth-client";
 import { StoreProvider, useStore } from "./src/state/store";
 import { SwipeDeck } from "./src/components/SwipeDeck";
@@ -83,6 +84,7 @@ interface ServerLibrary {
   }[];
   neverArtists: string[];
   neverTracks?: string[];
+  taste?: { languages: string[]; genres: string[]; adventure: string } | null;
   replayContainers?: string[];
   saveTarget: string;
   isAdmin: boolean;
@@ -141,6 +143,7 @@ function Shell() {
     applyCatalog,
     setReplay,
     unbury,
+    setTaste,
   } = useStore();
   const [screen, setScreen] = useState<Screen>("home");
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
@@ -181,6 +184,7 @@ function Shell() {
   const deleteAccountMutation = useMutation(anyApi.library.deleteMyAccount);
   const setReplayMutation = useMutation(anyApi.library.setReplayContainer);
   const unburyMutation = useMutation(anyApi.library.unburyTrack);
+  const setTasteMutation = useMutation(anyApi.library.setTaste);
 
   useEffect(() => {
     if (serverTracks && serverTracks.length > 0) {
@@ -294,6 +298,7 @@ function Shell() {
         neverArtists: library.neverArtists,
         neverTracks: library.neverTracks ?? [],
         replayContainers: library.replayContainers ?? [],
+        taste: coerceTaste(library.taste),
         saveTarget: library.saveTarget as SaveTarget,
       });
     }
@@ -618,8 +623,13 @@ function Shell() {
     return (
       <Onboarding
         demoTracks={state.queue.slice(3, 8)}
-        onFinish={() => {
+        demoCatalog={state.catalog}
+        onFinish={(taste) => {
           void AsyncStorage.setItem(ONBOARD_KEY, "1");
+          // apply locally first so the very first deck is already tilted; the
+          // server copy is for the next device they sign in on
+          setTaste(taste);
+          if (signedIn) void setTasteMutation(taste).catch(() => undefined);
           setOnboarded(true);
           setScreen("discover");
         }}

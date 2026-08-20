@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Dimensions,
   Pressable,
@@ -26,6 +26,12 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import type { SwipeDir, Track } from "../types";
+import {
+  ADVENTURE,
+  EMPTY_TASTE,
+  availableTasteOptions,
+  type TastePrefs,
+} from "../data/taste";
 import { resolveDirWorklet } from "./SwipeDeck";
 import { colors, fonts, radii } from "../design/tokens";
 
@@ -232,18 +238,33 @@ function Dot({ on }: { on: boolean }) {
  * Web's interactive Onboarding: step 0 welcome, steps 1-4 make the user
  * actually perform each swipe on a demo card, step 5 wraps up.
  */
+const TASTE_STEPS = 3;
+const LAST_STEP = TASTE_STEPS + GESTURE_STEPS.length + 1;
+
 export function Onboarding({
   demoTracks,
+  demoCatalog,
   onFinish,
 }: {
   demoTracks: Track[];
-  onFinish: () => void;
+  /** the live deck, so the questions only offer what it can serve */
+  demoCatalog: Track[];
+  onFinish: (taste: TastePrefs) => void;
 }) {
-  // step 0 = welcome, 1-4 = gestures, 5 = done
+  // 0 = welcome, 1-3 = taste, 4-7 = gestures, 8 = done
   const [step, setStep] = useState(0);
-  const gs = step >= 1 && step <= 4 ? GESTURE_STEPS[step - 1] : null;
+  const [taste, setTaste] = useState<TastePrefs>(EMPTY_TASTE);
+  const gi = step - TASTE_STEPS;
+  const gs = gi >= 1 && gi <= GESTURE_STEPS.length ? GESTURE_STEPS[gi - 1] : null;
+  const options = useMemo(() => availableTasteOptions(demoCatalog), [demoCatalog]);
+  const finish = () => onFinish(taste);
+  const toggle = (key: "languages" | "genres", id: string) =>
+    setTaste((t) => ({
+      ...t,
+      [key]: t[key].includes(id) ? t[key].filter((x) => x !== id) : [...t[key], id],
+    }));
   const demoTrack =
-    gs && demoTracks.length ? demoTracks[(step - 1) % demoTracks.length] : null;
+    gs && demoTracks.length ? demoTracks[(gi - 1) % demoTracks.length] : null;
 
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
@@ -267,6 +288,71 @@ export function Onboarding({
               We play you the best part of songs you've never heard. Four swipes
               teach us exactly what you love.
             </Text>
+          </Animated.View>
+        )}
+
+        {step >= 1 && step <= TASTE_STEPS && (
+          <Animated.View
+            key={`taste-${step}`}
+            entering={FadeInDown.duration(280)}
+            exiting={FadeOutUp.duration(180)}
+            style={styles.stepWrap}
+          >
+            <Text style={[styles.headline, styles.headlineSm]}>
+              {step === 1
+                ? "what do you listen in?"
+                : step === 2
+                  ? "and what sounds?"
+                  : "how far off the map?"}
+            </Text>
+            {step < 3 && (
+              <Text style={styles.copy}>
+                {step === 1
+                  ? "Pick as many as you like. This matters more than genre."
+                  : "A rough steer, not a filter."}
+              </Text>
+            )}
+            {step === 3 ? (
+              <View style={styles.choices}>
+                {ADVENTURE.map((a) => {
+                  const on = taste.adventure === a.id;
+                  return (
+                    <Pressable
+                      key={a.id}
+                      style={[styles.choice, on && styles.choiceOn]}
+                      onPress={() => setTaste((t) => ({ ...t, adventure: a.id }))}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={`${a.label}. ${a.copy}`}
+                    >
+                      <Text style={styles.choiceLabel}>{a.label}</Text>
+                      <Text style={styles.choiceCopy}>{a.copy}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.chips}>
+                {(step === 1 ? options.languages : options.genres).map((o) => {
+                  const key = step === 1 ? "languages" : "genres";
+                  const on = taste[key].includes(o.id);
+                  return (
+                    <Pressable
+                      key={o.id}
+                      style={[styles.chip, on && styles.chipOn]}
+                      onPress={() => toggle(key, o.id)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on }}
+                      accessibilityLabel={o.label}
+                    >
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                        {o.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </Animated.View>
         )}
 
@@ -341,14 +427,14 @@ export function Onboarding({
       {step === 5 && (
         <Pressable
           style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
-          onPress={onFinish}
+          onPress={finish}
         >
           <Text style={styles.primaryText}>Start discovering</Text>
         </Pressable>
       )}
 
       {step < 5 ? (
-        <Pressable style={styles.skip} hitSlop={8} onPress={onFinish}>
+        <Pressable style={styles.skip} hitSlop={8} onPress={finish}>
           <Text style={styles.skipText}>Skip the tour</Text>
         </Pressable>
       ) : (
@@ -369,6 +455,45 @@ const absFill = {
 };
 
 const styles = StyleSheet.create({
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 18,
+    maxWidth: 340,
+    alignSelf: "center",
+  },
+  chip: {
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  chipOn: {
+    borderColor: colors.accentDefault,
+    backgroundColor: "rgba(255,61,113,0.16)",
+  },
+  chipText: { color: colors.muted, fontSize: 13.5, fontWeight: "600" },
+  chipTextOn: { color: colors.text },
+  choices: { gap: 10, marginTop: 18, width: "100%", maxWidth: 340, alignSelf: "center" },
+  choice: {
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    gap: 3,
+  },
+  choiceOn: {
+    borderColor: colors.accentDefault,
+    backgroundColor: "rgba(255,61,113,0.14)",
+  },
+  choiceLabel: { color: colors.text, fontSize: 14.5, fontWeight: "700" },
+  choiceCopy: { color: colors.muted, fontSize: 12 },
   root: { flex: 1, backgroundColor: colors.bg, padding: 24 },
   wordmark: {
     fontFamily: fonts.display,
