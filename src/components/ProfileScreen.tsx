@@ -238,30 +238,57 @@ function AuthForm({ accent }: { accent: string }) {
             : "Sign in to pick up your library where you left it."}
         </Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="email"
-          placeholderTextColor={colors.muted}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          autoComplete="email"
-          returnKeyType="next"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="password (8+ characters)"
-          placeholderTextColor={colors.muted}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-          returnKeyType="go"
-          onSubmitEditing={() => void submit()}
-        />
+        {/* 01 — identity */}
+        <View style={styles.cluster}>
+          <View style={styles.clusterHead}>
+            <Text style={[styles.clusterNum, { color: accent, borderColor: accent }]}>01</Text>
+            <Text style={styles.clusterTitle}>who are you</Text>
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="you@example.com"
+            placeholderTextColor={colors.muted}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            autoComplete="email"
+            returnKeyType="next"
+          />
+          <Text style={styles.clusterHint}>
+            {mode === "signup"
+              ? "the email your library will follow across devices"
+              : "the one you signed up with"}
+          </Text>
+        </View>
+
+        {/* 02 — the key */}
+        <View style={styles.cluster}>
+          <View style={styles.clusterHead}>
+            <Text style={[styles.clusterNum, { color: accent, borderColor: accent }]}>02</Text>
+            <Text style={styles.clusterTitle}>the key</Text>
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder={
+              mode === "signup" ? "create a password (8+ characters)" : "your password"
+            }
+            placeholderTextColor={colors.muted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            returnKeyType="go"
+            onSubmitEditing={() => void submit()}
+          />
+          <Text style={styles.clusterHint}>
+            {mode === "signup"
+              ? "hashed on our side — even we can't read it"
+              : "eight characters minimum"}
+          </Text>
+        </View>
 
         {error && <Text style={styles.authError}>{error}</Text>}
 
@@ -431,6 +458,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 26,
     paddingBottom: 24,
+    gap: 14,
+  },
+  cluster: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+  },
+  clusterHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 2,
+  },
+  clusterNum: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    borderWidth: 1,
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  clusterTitle: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: colors.text,
+  },
+  clusterHint: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11.5,
+    color: colors.muted,
   },
   authTitle: {
     fontFamily: fonts.display,
