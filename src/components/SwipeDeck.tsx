@@ -9,16 +9,17 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Dimensions,
   Image,
   type LayoutChangeEvent,
   Pressable,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   Gesture,
   GestureDetector,
@@ -39,11 +40,10 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import type { SaveTarget, SwipeDir, Track } from "../types";
-import { colors, fonts, gesture, radii } from "../design/tokens";
+import type { HapticsLevel, MotionLevel } from "../data/prefs";
+import { colors, fonts, gesture as GESTURE, radii } from "../design/tokens";
 import { DiscFX, type SaveFxData, type SaveRelease } from "./DiscFX";
 import { Eq } from "./Eq";
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 // a save only locks the deck briefly — the DiscFX overlay plays above while
 // the next card is already swipeable
@@ -61,15 +61,19 @@ export function resolveDirWorklet(
   ty: number,
   vx: number,
   vy: number,
+  sensitivity = 1,
 ): SwipeDir | null {
   "worklet";
+  // sensitivity scales the distance gate (not the flick velocity — a fast
+  // flick should always commit); lower value = shorter drag needed
+  const commitDistance = GESTURE.commitDistance * sensitivity;
   const absX = Math.abs(tx);
   const absY = Math.abs(ty);
-  const byDistance = Math.max(absX, absY) > gesture.commitDistance;
-  const byFlick = Math.max(Math.abs(vx), Math.abs(vy)) > gesture.commitVelocity;
+  const byDistance = Math.max(absX, absY) > commitDistance;
+  const byFlick = Math.max(Math.abs(vx), Math.abs(vy)) > GESTURE.commitVelocity;
   if (!byDistance && !byFlick) return null;
-  if (absX > absY * gesture.axisDominance) return tx > 0 ? "right" : "left";
-  if (absY > absX * gesture.axisDominance) return ty > 0 ? "down" : "up";
+  if (absX > absY * GESTURE.axisDominance) return tx > 0 ? "right" : "left";
+  if (absY > absX * GESTURE.axisDominance) return ty > 0 ? "down" : "up";
   return null;
 }
 
@@ -167,15 +171,20 @@ function CardScrim() {
 function ActionButton({
   icon,
   color,
+  label,
   onPress,
 }: {
   icon: keyof typeof Feather.glyphMap;
   color: string;
+  /** what the button does, announced to screen readers (web parity) */
+  label: string;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
       hitSlop={6}
     >
@@ -199,7 +208,12 @@ export function SwipeDeck({
   onSwipe,
   hookIndex,
   hookCount,
+  hookLabel,
   onNextHook,
+  gateSwipe,
+  sensitivity = 1,
+  motion = "full",
+  haptics = "subtle",
 }: {
   tracks: Track[]; // [onDeck, next, nextNext]
   backToken: number; // bumped by ↩ — cancels any in-flight save FX
@@ -215,9 +229,20 @@ export function SwipeDeck({
   onSwipe: (dir: SwipeDir) => void;
   hookIndex: number; // which window of the song is playing
   hookCount: number; // 1 means the track has no hooks marked
+  /** the current hook's own name, when its creator gave it one */
+  hookLabel?: string;
   onNextHook: () => void;
+  /** return false to refuse a swipe — the card springs back untouched */
+  gateSwipe?: (dir: SwipeDir) => boolean;
+  /** scales how far a card must travel before a swipe commits */
+  sensitivity?: number;
+  motion?: MotionLevel;
+  haptics?: HapticsLevel;
 }) {
   const [onDeck, next, nextNext] = tracks;
+  // live dims: module-scope Dimensions went stale on rotation/foldables and
+  // computed fly-out distances once, so cards died mid-screen on tall screens
+  const { width: SCREEN_W, height: SCREEN_H } = useWindowDimensions();
 
   // warm the image cache for upcoming cards — keyed on the actual ids, NOT
   // the array identity (which changes on every 250ms progress re-render)
@@ -291,30 +316,70 @@ export function SwipeDeck({
     );
   }, []);
 
+  const buzz = useCallback(
+    (style: Haptics.ImpactFeedbackStyle) => {
+      if (haptics === "off") return;
+      if (style === Haptics.ImpactFeedbackStyle.Heavy && haptics === "subtle") {
+        style = Haptics.ImpactFeedbackStyle.Light;
+      }
+      void Haptics.impactAsync(style).catch(() => undefined);
+    },
+    [haptics],
+  );
+
   const handleDir = useCallback(
     (dir: SwipeDir, release?: SaveRelease) => {
       if (!onDeck || locked.value) return;
+      // the login wall refuses BEFORE anything commits or flies — same
+      // contract as web: a gated swipe snaps back untouched
+      if (gateSwipe && !gateSwipe(dir)) {
+        x.value = withSpring(0, { stiffness: 320, damping: 26 });
+        y.value = withSpring(0, { stiffness: 320, damping: 26 });
+        return;
+      }
       locked.value = true;
       onSwipeStart(); // the gesture is committed — guards arm from this moment
+      // physical feedback lands at the moment of commitment, not on release —
+      // it should feel like the card left your hand, not like the app noticed
+      buzz(dir === "down" ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+      const animate = motion !== "off";
       if (dir === "down") {
-        // the DiscFX overlay takes over from the exact release pose — commit
-        // fires NOW so the next card + audio start while the disc FX plays
         saveCount.current += 1;
-        setSaveFxList((list) => [
-          ...list.slice(-2), // at most 3 discs in flight
-          {
-            key: Date.now(),
-            track: onDeck,
-            from: release ?? { x: 0, y: 0, vx: 0, vy: 650 }, // ♥ button: drop from center
-            mode: saveCount.current % 5 === 0 ? "cinematic" : "fast",
-          },
-        ]);
+        // motion "off" skips the vinyl entirely; "reduced" always takes the
+        // punchy ~500ms cut, never the cinematic one
+        const mode =
+          !animate || motion === "reduced" || saveCount.current % 5 !== 0
+            ? animate
+              ? "fast"
+              : null
+            : "cinematic";
+        if (mode) {
+          // the DiscFX overlay takes over from the exact release pose — commit
+          // fires NOW so the next card + audio start while the disc FX plays
+          setSaveFxList((list) => [
+            ...list.slice(-2), // at most 3 discs in flight
+            {
+              key: Date.now(),
+              track: onDeck,
+              from: release ?? { x: 0, y: 0, vx: 0, vy: 650 }, // ♥ button: drop from center
+              mode,
+            },
+          ]);
+        }
         onSwipe("down"); // pose reset happens in the promotion layout effect
         timers.current.push(
           setTimeout(() => {
             locked.value = false;
           }, SAVE_LOCK_MS),
         );
+        return;
+      }
+      if (!animate) {
+        // no fly-out, no flashes: the queue advances at once
+        x.value = 0;
+        y.value = 0;
+        locked.value = false;
+        commit(dir);
         return;
       }
       if (dir === "right") flashRing();
@@ -327,13 +392,26 @@ export function SwipeDeck({
         if (finished) runOnJS(commit)(dir);
       });
     },
-    [onDeck, onSwipe, onSwipeStart, flashRing, flashVignette, commit],
+    [
+      onDeck, gateSwipe, buzz, motion, onSwipeStart, onSwipe, flashRing,
+      flashVignette, commit, SCREEN_W, SCREEN_H, x, y, locked,
+    ],
   );
 
   // ---- scrubber: its own pan that beats the card pan, so dragging the
   // bottom 22px seeks instead of swiping ----
   const barW = useSharedValue(1);
   const scrubFrac = useSharedValue(-1); // -1 = not scrubbing → show `progress`
+
+  // progress arrives as React state ~4×/s; animating toward it on the UI
+  // thread turns the stepped bar into a glide without extra re-renders
+  const progressSV = useSharedValue(progress);
+  useEffect(() => {
+    progressSV.value = withTiming(Math.min(Math.max(progress, 0), 1), {
+      duration: 260,
+      easing: Easing.linear,
+    });
+  }, [progress]);
 
   const seekTo = useCallback(
     (f: number) => onSeek(Math.min(Math.max(f, 0), 1)),
@@ -357,16 +435,16 @@ export function SwipeDeck({
     });
 
   const fillStyle = useAnimatedStyle(() => {
-    const f = scrubFrac.value >= 0 ? scrubFrac.value : progress;
+    const f = scrubFrac.value >= 0 ? scrubFrac.value : progressSV.value;
     return { width: Math.min(Math.max(f, 0), 1) * barW.value };
-  }, [progress]);
+  });
   const knobStyle = useAnimatedStyle(() => {
-    const f = scrubFrac.value >= 0 ? scrubFrac.value : progress;
+    const f = scrubFrac.value >= 0 ? scrubFrac.value : progressSV.value;
     return {
       left: Math.min(Math.max(f, 0), 1) * barW.value - 4,
       opacity: scrubFrac.value >= 0 ? 1 : 0,
     };
-  }, [progress]);
+  });
 
   const pan = Gesture.Pan()
     .requireExternalGestureToFail(scrubPan)
@@ -382,6 +460,7 @@ export function SwipeDeck({
         e.translationY,
         e.velocityX,
         e.velocityY,
+        sensitivity,
       );
       if (dir === null) {
         x.value = withSpring(0, { stiffness: 320, damping: 26 });
@@ -427,7 +506,7 @@ export function SwipeDeck({
   // whichever DeckCard currently holds the top role
   const chrome = onDeck ? (
     <>
-      <HookDots count={hookCount} index={hookIndex} progress={progress} />
+      <HookDots count={hookCount} index={hookIndex} progress={progressSV} />
       {hookCount > 1 && (
         <Pressable
           style={styles.hookTap}
@@ -435,7 +514,9 @@ export function SwipeDeck({
           accessibilityRole="button"
           accessibilityLabel={`next hook, ${hookIndex + 1} of ${hookCount}`}
         >
-          <Text style={styles.hookTapLabel}>next hook</Text>
+          <Text style={styles.hookTapLabel} numberOfLines={1}>
+            {hookLabel || "next hook"}
+          </Text>
         </Pressable>
       )}
       <Animated.View
@@ -579,12 +660,15 @@ export function SwipeDeck({
       </View>
 
       <View style={styles.actions}>
-        <ActionButton icon="x" color={colors.never} onPress={() => handleDir("left")} />
-        <ActionButton icon="arrow-up" color={colors.text} onPress={() => handleDir("up")} />
+        <ActionButton icon="x" color={colors.never} label="never play this artist" onPress={() => handleDir("left")} />
+        <ActionButton icon="arrow-up" color={colors.text} label="skip" onPress={() => handleDir("up")} />
         <Pressable
           onPress={onToggle}
           onLongPress={onOpenFullSong}
           delayLongPress={480}
+          accessibilityRole="button"
+          accessibilityLabel={playing ? "pause" : "play"}
+          accessibilityHint="hold to hear the full song elsewhere"
           style={({ pressed }) => [styles.primaryBtn, pressed && styles.actionPressed]}
           hitSlop={6}
         >
@@ -596,8 +680,8 @@ export function SwipeDeck({
             style={playing ? undefined : { marginLeft: 3 }}
           />
         </Pressable>
-        <ActionButton icon="heart" color={colors.save} onPress={() => handleDir("down")} />
-        <ActionButton icon="zap" color={colors.more} onPress={() => handleDir("right")} />
+        <ActionButton icon="heart" color={colors.save} label="save" onPress={() => handleDir("down")} />
+        <ActionButton icon="zap" color={colors.more} label="more like this" onPress={() => handleDir("right")} />
       </View>
     </View>
   );
@@ -871,6 +955,9 @@ const styles = StyleSheet.create({
  * Windows behind the current one read as full, the one playing fills as it
  * runs, the rest sit empty. A single window renders nothing — a lone full-width
  * bar would just be noise on a track nobody has marked hooks in.
+ *
+ * Fills are UI-thread styles off the shared progress value: the bars glide
+ * between the player's 4Hz ticks without re-rendering anything.
  */
 function HookDots({
   count,
@@ -879,21 +966,33 @@ function HookDots({
 }: {
   count: number;
   index: number;
-  progress: number;
+  progress: SharedValue<number>;
 }) {
   if (count < 2) return null;
   return (
     <View style={styles.hookDots} pointerEvents="none">
       {Array.from({ length: count }, (_, i) => (
-        <View key={i} style={styles.hookDot}>
-          <View
-            style={[
-              styles.hookDotFill,
-              { width: `${(i < index ? 1 : i === index ? progress : 0) * 100}%` },
-            ]}
-          />
-        </View>
+        <Dot key={i} done={i < index} active={i === index} progress={progress} />
       ))}
+    </View>
+  );
+}
+
+function Dot({
+  done,
+  active,
+  progress,
+}: {
+  done: boolean;
+  active: boolean;
+  progress: SharedValue<number>;
+}) {
+  const fill = useAnimatedStyle(() => ({
+    width: `${(done ? 1 : active ? Math.min(Math.max(progress.value, 0), 1) : 0) * 100}%`,
+  }));
+  return (
+    <View style={styles.hookDot}>
+      <Animated.View style={[styles.hookDotFill, fill]} />
     </View>
   );
 }

@@ -12,8 +12,13 @@ export function FullSongSheet({
   onClose: () => void;
 }) {
   const q = encodeURIComponent(`${track.title} ${track.artist}`);
+  // Only a pure-numeric id is an iTunes item — creator uploads ("own:…") and
+  // imports ("imp:…") would 404 as /song/{id}. Those get a storefront search.
+  const appleUrl = /^\d+$/.test(track.id)
+    ? `https://music.apple.com/us/song/${track.id}`
+    : `https://music.apple.com/us/search?term=${q}`;
   const services = [
-    { name: "Apple Music", url: `https://music.apple.com/us/song/${track.id}` },
+    { name: "Apple Music", url: appleUrl },
     { name: "Spotify", url: `https://open.spotify.com/search/${q}` },
     { name: "YouTube", url: `https://www.youtube.com/results?search_query=${q}` },
   ];

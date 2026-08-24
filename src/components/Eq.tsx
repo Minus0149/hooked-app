@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { AccessibilityInfo, StyleSheet, View } from "react-native";
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
@@ -24,9 +24,25 @@ function Bar({
   delay: number;
 }) {
   const v = useSharedValue(0.4);
+  const reduced = useSharedValue(false);
 
   useEffect(() => {
-    if (playing) {
+    // the OS-level reduce-motion setting stops this loop too — the app-level
+    // "motion" preference gates the deck FX separately
+    void AccessibilityInfo.isReduceMotionEnabled().then((r) => {
+      reduced.value = r;
+    });
+    const sub = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      (r) => {
+        reduced.value = r;
+      },
+    );
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (playing && !reduced.value) {
       v.value = withDelay(
         delay,
         withRepeat(
@@ -42,7 +58,7 @@ function Bar({
       v.value = withTiming(0.35, { duration: 180 });
     }
     return () => cancelAnimation(v);
-  }, [playing, delay]);
+  }, [playing, delay, reduced]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ scaleY: v.value }],

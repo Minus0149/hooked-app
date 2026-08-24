@@ -8,7 +8,9 @@ config.transformer = {
     ...config.transformer?.minifierConfig,
     compress: {
       ...config.transformer?.minifierConfig?.compress,
-      drop_console: true,
+      // strip chatter but keep warn/error — they carry the diagnostics
+      // (dead audio, crash reports) worth having in release builds
+      pure_funcs: ["console.log", "console.info", "console.debug"],
       drop_debugger: true,
     },
     mangle: true,

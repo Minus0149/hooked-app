@@ -1,15 +1,16 @@
+import { memo } from "react";
 import {
   Alert,
+  FlatList,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutLeft } from "react-native-reanimated";
 import { useStore } from "../state/store";
 import type { LibraryContainer, Track } from "../types";
 import { colors, fonts, mixHex, radii, withAlpha } from "../design/tokens";
@@ -29,6 +30,66 @@ const COLLAGE_POS = [
   { bottom: 0, left: 8, zIndex: 2 },
   { bottom: 4, right: 6, zIndex: 1 },
 ] as const;
+
+/**
+ * One track row. Memoized and rendered through a FlatList: mapping every
+ * saved song into its own animated view made libraries of hundreds of songs
+ * jank on mount and scroll.
+ */
+const TrackRow = memo(function TrackRow({
+  t,
+  i,
+  accent,
+  onPlay,
+  onRemove,
+}: {
+  t: Track;
+  i: number;
+  accent: string;
+  onPlay: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(i, 10) * 45)
+        .springify()
+        .stiffness(260)
+        .damping(26)}
+      exiting={FadeOutLeft.duration(160)}
+      style={styles.row}
+    >
+      <Text style={[styles.index, { color: mixHex(accent, colors.muted, 0.75) }]}>
+        {String(i + 1).padStart(2, "0")}
+      </Text>
+      <Pressable
+        style={({ pressed }) => [styles.rowMain, pressed && { opacity: 0.7 }]}
+        onPress={() => onPlay(t.id)}
+      >
+        <Image source={{ uri: art(t.artwork, 100) }} style={styles.rowArt} />
+        <View style={styles.rowMeta}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {t.title}
+          </Text>
+          <Text style={styles.rowArtist} numberOfLines={1}>
+            {t.artist}
+          </Text>
+        </View>
+      </Pressable>
+      <Text style={styles.rowGenre} numberOfLines={1}>
+        {t.genre.toUpperCase()}
+      </Text>
+      <Pressable
+        style={({ pressed }) => [styles.rowBtn, pressed && { opacity: 0.6 }]}
+        onPress={() => onRemove(t.id)}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={`remove ${t.title}`}
+      >
+        <Feather name="x" size={15} color={colors.muted} />
+      </Pressable>
+    </Animated.View>
+  );
+});
 
 export function LibraryScreen({
   container,
@@ -91,6 +152,95 @@ export function LibraryScreen({
     );
   };
 
+  const header = (
+    <Animated.View entering={FadeInDown.springify().stiffness(260).damping(26)}>
+      <View style={styles.hero}>
+        <View style={styles.collage}>
+          {collage.map((t, i) => (
+            <Image
+              key={t.id}
+              source={{ uri: art(t.artwork, 200) }}
+              style={[
+                styles.collageArt,
+                COLLAGE_POS[i],
+                { transform: [{ rotate: `${(i % 2 ? 1 : -1) * (2 + i)}deg` }] },
+              ]}
+            />
+          ))}
+          {collage.length === 0 && (
+            <View
+              style={[
+                styles.collageEmpty,
+                { borderColor: mixHex(accent, colors.line, 0.5) },
+              ]}
+            >
+              <Feather name={icon} size={18} color={accent} />
+            </View>
+          )}
+        </View>
+        <View style={styles.heroMeta}>
+          <Text style={[styles.kicker, { color: accent }]} numberOfLines={1}>
+            <Feather name={icon} size={10.5} color={accent} />{" "}
+            {playlistId ? "PLAYLIST" : "COLLECTION"}
+            {isSaveTarget && (
+              <Text style={{ color: colors.save }}> · saving here</Text>
+            )}
+          </Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.sub}>
+            {tracks.length} {tracks.length === 1 ? "song" : "songs"}
+            {tracks.length > 0 && ` · ~${totalMinutes(tracks)} min of music`}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.ctas}>
+        <Pressable
+          disabled={tracks.length === 0}
+          style={({ pressed }) => [
+            styles.cta,
+            { backgroundColor: accent, shadowColor: accent },
+            tracks.length === 0 && { opacity: 0.35 },
+            pressed && { transform: [{ scale: 0.96 }] },
+          ]}
+          onPress={() => tracks[0] && onPlay(tracks[0].id)}
+        >
+          <Feather name="play" size={13} color={colors.ink} />
+          <Text style={styles.ctaText}>Play</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.cta,
+            styles.ctaGhost,
+            { borderColor: mixHex(accent, colors.line, 0.45) },
+            pressed && { transform: [{ scale: 0.96 }] },
+          ]}
+          onPress={() => onDiscoverInto(container)}
+        >
+          <Feather name="zap" size={13} color={colors.text} />
+          <Text style={[styles.ctaText, { color: colors.text }]}>
+            Discover into this
+          </Text>
+        </Pressable>
+      </View>
+
+      {tracks.length === 0 && (
+        <Animated.View
+          entering={FadeInDown.delay(80).springify().stiffness(260).damping(26)}
+          style={styles.empty}
+        >
+          <Text style={styles.emptyText}>
+            Nothing in here yet. Hit{" "}
+            <Text style={{ color: accent, fontFamily: fonts.bodyBold }}>
+              Discover into this
+            </Text>{" "}
+            — every song you swipe down will land right here.
+          </Text>
+        </Animated.View>
+      )}
+    </Animated.View>
+  );
+
   return (
     <View style={styles.screen}>
       {/* accent glow bleeding from behind the header */}
@@ -104,6 +254,8 @@ export function LibraryScreen({
         <Pressable
           style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
           onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="back"
         >
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
@@ -114,6 +266,8 @@ export function LibraryScreen({
           <Pressable
             style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
             onPress={confirmDelete}
+            accessibilityRole="button"
+            accessibilityLabel="delete playlist"
           >
             <Feather name="x" size={18} color={colors.never} />
           </Pressable>
@@ -122,138 +276,21 @@ export function LibraryScreen({
         )}
       </View>
 
-      <ScrollView
+      <FlatList
         style={{ flex: 1 }}
+        data={tracks}
+        keyExtractor={(t) => t.id}
+        ListHeaderComponent={header}
+        renderItem={({ item, index }) => (
+          <TrackRow t={item} i={index} accent={accent} onPlay={onPlay} onRemove={onRemove} />
+        )}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={9}
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
-      >
-        <Animated.View entering={FadeInDown.springify().stiffness(260).damping(26)}>
-          <View style={styles.hero}>
-            <View style={styles.collage}>
-              {collage.map((t, i) => (
-                <Image
-                  key={t.id}
-                  source={{ uri: art(t.artwork, 200) }}
-                  style={[
-                    styles.collageArt,
-                    COLLAGE_POS[i],
-                    { transform: [{ rotate: `${(i % 2 ? 1 : -1) * (2 + i)}deg` }] },
-                  ]}
-                />
-              ))}
-              {collage.length === 0 && (
-                <View
-                  style={[
-                    styles.collageEmpty,
-                    { borderColor: mixHex(accent, colors.line, 0.5) },
-                  ]}
-                >
-                  <Feather name={icon} size={18} color={accent} />
-                </View>
-              )}
-            </View>
-            <View style={styles.heroMeta}>
-              <Text style={[styles.kicker, { color: accent }]} numberOfLines={1}>
-                <Feather name={icon} size={10.5} color={accent} />{" "}
-                {playlistId ? "PLAYLIST" : "COLLECTION"}
-                {isSaveTarget && (
-                  <Text style={{ color: colors.save }}> · saving here</Text>
-                )}
-              </Text>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.sub}>
-                {tracks.length} {tracks.length === 1 ? "song" : "songs"}
-                {tracks.length > 0 && ` · ~${totalMinutes(tracks)} min of music`}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.ctas}>
-            <Pressable
-              disabled={tracks.length === 0}
-              style={({ pressed }) => [
-                styles.cta,
-                { backgroundColor: accent, shadowColor: accent },
-                tracks.length === 0 && { opacity: 0.35 },
-                pressed && { transform: [{ scale: 0.96 }] },
-              ]}
-              onPress={() => tracks[0] && onPlay(tracks[0].id)}
-            >
-              <Feather name="play" size={13} color={colors.ink} />
-              <Text style={styles.ctaText}>Play</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.cta,
-                styles.ctaGhost,
-                { borderColor: mixHex(accent, colors.line, 0.45) },
-                pressed && { transform: [{ scale: 0.96 }] },
-              ]}
-              onPress={() => onDiscoverInto(container)}
-            >
-              <Feather name="zap" size={13} color={colors.text} />
-              <Text style={[styles.ctaText, { color: colors.text }]}>
-                Discover into this
-              </Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-
-        {tracks.length === 0 ? (
-          <Animated.View
-            entering={FadeInDown.delay(80).springify().stiffness(260).damping(26)}
-            style={styles.empty}
-          >
-            <Text style={styles.emptyText}>
-              Nothing in here yet. Hit{" "}
-              <Text style={{ color: accent, fontFamily: fonts.bodyBold }}>
-                Discover into this
-              </Text>{" "}
-              — every song you swipe down will land right here.
-            </Text>
-          </Animated.View>
-        ) : (
-          tracks.map((t, i) => (
-            <Animated.View
-              key={t.id}
-              entering={FadeInDown.delay(Math.min(i, 10) * 45)
-                .springify()
-                .stiffness(260)
-                .damping(26)}
-              style={styles.row}
-            >
-              <Text style={[styles.index, { color: mixHex(accent, colors.muted, 0.75) }]}>
-                {String(i + 1).padStart(2, "0")}
-              </Text>
-              <Pressable
-                style={({ pressed }) => [styles.rowMain, pressed && { opacity: 0.7 }]}
-                onPress={() => onPlay(t.id)}
-              >
-                <Image source={{ uri: art(t.artwork, 100) }} style={styles.rowArt} />
-                <View style={styles.rowMeta}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {t.title}
-                  </Text>
-                  <Text style={styles.rowArtist} numberOfLines={1}>
-                    {t.artist}
-                  </Text>
-                </View>
-              </Pressable>
-              <Text style={styles.rowGenre} numberOfLines={1}>
-                {t.genre.toUpperCase()}
-              </Text>
-              <Pressable
-                style={({ pressed }) => [styles.rowBtn, pressed && { opacity: 0.6 }]}
-                onPress={() => onRemove(t.id)}
-                hitSlop={6}
-              >
-                <Feather name="x" size={15} color={colors.muted} />
-              </Pressable>
-            </Animated.View>
-          ))
-        )}
-        <View style={{ height: 10 }} />
-      </ScrollView>
+      />
+      <View style={{ height: 10 }} />
     </View>
   );
 }
@@ -290,135 +327,105 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  topBtnText: { color: colors.text, fontSize: 16 },
   body: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
 
   hero: {
     flexDirection: "row",
     alignItems: "center",
     gap: 18,
-    marginTop: 8,
     marginBottom: 18,
   },
-  collage: { width: 108, height: 108, flexShrink: 0 },
+  collage: { width: 96, height: 96 },
   collageArt: {
     position: "absolute",
-    width: 72,
-    height: 72,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "rgba(8,8,12,0.9)",
+    width: 58,
+    height: 58,
+    borderRadius: 8,
+    backgroundColor: colors.surface2,
   },
   collageEmpty: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
     borderStyle: "dashed",
   },
-  heroMeta: { flex: 1, minWidth: 0 },
+  heroMeta: { flex: 1, minWidth: 0, gap: 3 },
   kicker: {
     fontFamily: fonts.bodyBold,
-    fontSize: 10.5,
-    letterSpacing: 1.7,
-    marginBottom: 6,
+    fontSize: 10,
+    letterSpacing: 1.4,
   },
   title: {
     fontFamily: fonts.display,
-    fontSize: 23,
-    lineHeight: 27,
+    fontSize: 22,
     letterSpacing: -0.4,
     color: colors.text,
   },
-  sub: {
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 5,
-  },
-
-  ctas: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  sub: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },
+  ctas: { flexDirection: "row", gap: 10, marginBottom: 14 },
   cta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: radii.pill,
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    justifyContent: "center",
+    gap: 7,
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 999,
   },
-  ctaGhost: {
-    backgroundColor: colors.surface,
+  ctaGhost: { backgroundColor: "transparent", borderWidth: 1 },
+  ctaText: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink },
+  empty: {
+    padding: 24,
+    borderRadius: 16,
     borderWidth: 1,
-    shadowOpacity: 0,
-    elevation: 0,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    marginTop: 4,
   },
-  ctaText: {
-    fontFamily: fonts.displayBold,
-    fontSize: 12.5,
-    color: colors.ink,
+  emptyText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.muted,
+    textAlign: "center",
   },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 7,
+    gap: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
     marginBottom: 2,
   },
   index: {
-    width: 22,
-    flexShrink: 0,
-    fontFamily: fonts.displayBold,
+    fontFamily: fonts.display,
     fontSize: 11,
-    textAlign: "right",
+    width: 22,
   },
   rowMain: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 11,
   },
-  rowArt: { width: 46, height: 46, borderRadius: 11, flexShrink: 0 },
-  rowMeta: { flex: 1, minWidth: 0, gap: 2 },
-  rowTitle: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.text },
-  rowArtist: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted },
+  rowArt: { width: 40, height: 40, borderRadius: 8, backgroundColor: colors.surface2 },
+  rowMeta: { flex: 1, minWidth: 0, gap: 1 },
+  rowTitle: { fontFamily: fonts.bodySemiBold, fontSize: 13.5, color: colors.text },
+  rowArtist: { fontFamily: fonts.bodyMedium, fontSize: 11.5, color: colors.muted },
   rowGenre: {
     fontFamily: fonts.bodyBold,
-    fontSize: 10,
-    letterSpacing: 1,
+    fontSize: 8.5,
+    letterSpacing: 0.8,
     color: colors.muted,
-    maxWidth: 74,
-    flexShrink: 0,
+    maxWidth: 64,
   },
-  rowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-
-  empty: {
-    padding: 22,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: colors.line,
-  },
-  emptyText: {
-    fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 21,
-    color: colors.muted,
-    textAlign: "center",
-  },
+  rowBtn: { padding: 6 },
 });

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { colors } from "../design/tokens";
+import { art } from "../lib/art";
 import { useStore } from "../state/store";
 
 /**
@@ -32,14 +33,14 @@ function Cover({ tracks, accent }: { tracks: Entry["tracks"]; accent: string }) 
   if (shown.length < 4) {
     return (
       <View style={styles.cover}>
-        <Image source={{ uri: shown[0].artwork }} style={styles.coverFull} />
+        <Image source={{ uri: art(shown[0].artwork, 100) }} style={styles.coverFull} />
       </View>
     );
   }
   return (
     <View style={[styles.cover, styles.coverQuad]}>
       {shown.map((t) => (
-        <Image key={t.id} source={{ uri: t.artwork }} style={styles.coverCell} />
+        <Image key={t.id} source={{ uri: art(t.artwork, 100) }} style={styles.coverCell} />
       ))}
     </View>
   );

@@ -4,8 +4,11 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
+  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -14,13 +17,15 @@ import Animated, {
 } from "react-native-reanimated";
 import { colors, fonts } from "../design/tokens";
 
-const OFF_Y = 620; // safely below any phone's sheet height
-
 /**
  * Bottom sheet chrome shared by the save-target / new-playlist / full-song
  * sheets — animated translateY card over a fading backdrop, matching web's
  * .sheet / .sheet-backdrop. Children get the animated `close` so option taps
  * can dismiss with the slide-out instead of unmounting instantly.
+ *
+ * The off-screen park position is derived from the real window height: the
+ * old fixed 620px was shorter than tall sheets on big phones, so the card
+ * visibly popped into place instead of sliding.
  */
 export function Sheet({
   onClose,
@@ -29,7 +34,10 @@ export function Sheet({
   onClose: () => void;
   children: (close: () => void) => ReactNode;
 }) {
-  const ty = useSharedValue(OFF_Y);
+  const { height: WINDOW_H } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const offY = WINDOW_H; // fully below anything visible
+  const ty = useSharedValue(offY);
   const fade = useSharedValue(0);
 
   useEffect(() => {
@@ -39,9 +47,10 @@ export function Sheet({
 
   const close = useCallback(() => {
     fade.value = withTiming(0, { duration: 200 });
-    ty.value = withTiming(OFF_Y, { duration: 230 }, (finished) => {
+    ty.value = withTiming(offY, { duration: 230, easing: Easing.in(Easing.quad) }, (finished) => {
       if (finished) runOnJS(onClose)();
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose]);
 
   const backdropStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
@@ -56,9 +65,13 @@ export function Sheet({
       pointerEvents="box-none"
     >
       <Animated.View style={[styles.backdrop, backdropStyle]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={close}
+          accessibilityLabel="close"
+        />
       </Animated.View>
-      <Animated.View style={[styles.card, cardStyle]}>
+      <Animated.View style={[styles.card, { marginBottom: Math.max(insets.bottom, 12) }, cardStyle]}>
         {children(close)}
       </Animated.View>
     </KeyboardAvoidingView>
@@ -78,7 +91,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    bottom: 12,
+    bottom: 0,
+    maxHeight: "90%",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,

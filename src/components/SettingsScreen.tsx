@@ -1,108 +1,117 @@
-import { useEffect } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Animated, {
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { ReplayRules } from "./ReplayRules";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { useMutation, useQuery } from "convex/react";
+import { anyApi } from "convex/server";
 import { useStore } from "../state/store";
 import { colors, fonts, radii } from "../design/tokens";
-import { SITE_URL, WEB_APP_URL } from "../config/env";
+import { Row } from "./settings/kit";
 
-/** Animated track+knob switch matching web's .toggle — save-green when on. */
-function Toggle({ on }: { on: boolean }) {
-  const v = useSharedValue(on ? 1 : 0);
+/**
+ * The Support module: what the house ads are, how often they run right now
+ * (live config), and the opt-out — which asks once, honestly, because those
+ * cards are what keeps an independent deck independent.
+ */
+function SupportCard() {
+  const { state, setPrefs } = useStore();
+  const optedOut = state.prefs.adsOptOut;
+  const setPrefsMutation = useMutation(anyApi.library.setPrefs);
+  const adsConfig = useQuery(anyApi.ads.getConfig) as
+    | { enabled: boolean; everyNSwipes: number; maxPerDay: number }
+    | null
+    | undefined;
 
-  useEffect(() => {
-    v.value = withTiming(on ? 1 : 0, { duration: 200 });
-  }, [on]);
-
-  const trackStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(v.value, [0, 1], [colors.surface2, colors.save]),
-    borderColor: interpolateColor(v.value, [0, 1], [colors.line, colors.save]),
-  }));
-  const knobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: v.value * 17 }],
-  }));
+  const confirmOptOut = () => {
+    Alert.alert(
+      "Before you go…",
+      "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing — but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
+      [
+        {
+          text: "Keep them on",
+          style: "default",
+          onPress: () => {
+            setPrefs({ adsOptOut: false });
+            void setPrefsMutation({
+              motion: state.prefs.motion,
+              haptics: state.prefs.haptics,
+              accentMode: state.prefs.accentMode,
+              accentColor: state.prefs.accentColor,
+              swipeSensitivity: state.prefs.swipeSensitivity,
+              adsOptOut: false,
+            }).catch(() => undefined);
+          },
+        },
+        {
+          text: "Turn them off anyway",
+          style: "destructive",
+          onPress: () => {
+            setPrefs({ adsOptOut: true });
+            void setPrefsMutation({
+              motion: state.prefs.motion,
+              haptics: state.prefs.haptics,
+              accentMode: state.prefs.accentMode,
+              accentColor: state.prefs.accentColor,
+              swipeSensitivity: state.prefs.swipeSensitivity,
+              adsOptOut: true,
+            }).catch(() => undefined);
+          },
+        },
+      ],
+    );
+  };
 
   return (
-    <Animated.View style={[styles.toggle, trackStyle]}>
-      <Animated.View style={[styles.toggleKnob, knobStyle]} />
-    </Animated.View>
+    <View style={styles.support}>
+      <Text style={styles.supportTitle}>Support hooked</Text>
+      <Text style={styles.supportSub}>
+        {optedOut
+          ? "Ads are off. They'll stay off until you say otherwise."
+          : adsConfig?.enabled
+            ? `A small sponsored card every ~${adsConfig.everyNSwipes} swipes, never more than ${adsConfig.maxPerDay} a day. Music never stops for one.`
+            : "No cards are being shown right now."}
+      </Text>
+      <View style={styles.supportRow}>
+        <Pressable
+          style={[styles.supportChip, !optedOut && styles.chipOn]}
+          onPress={() => setPrefs({ adsOptOut: false })}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: !optedOut }}
+        >
+          <Text style={[styles.chipText, !optedOut && styles.chipTextOn]}>
+            On · keep it independent
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.supportChip, optedOut && styles.chipOn]}
+          onPress={() => (optedOut ? setPrefs({ adsOptOut : false }) : confirmOptOut())}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: optedOut }}
+        >
+          <Text style={[styles.chipText, optedOut && styles.chipTextOn]}>Off</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
-function Row({
-  icon,
-  iconColor,
-  label,
-  labelColor,
-  sub,
-  right,
-  onPress,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  iconColor?: string;
-  label: string;
-  labelColor?: string;
-  sub: string;
-  right?: React.ReactNode;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
-      onPress={onPress}
-      accessibilityRole="button"
-      // the icon carries meaning visually and nothing to a screen reader, so
-      // the label has to say what the row is and what state it's in
-      accessibilityLabel={sub ? `${label}. ${sub}` : label}
-    >
-      <View style={styles.rowIcon}>
-        <Feather name={icon} size={17} color={iconColor ?? colors.text} />
-      </View>
-      <View style={styles.rowLabelWrap}>
-        <Text style={[styles.rowLabel, labelColor != null && { color: labelColor }]}>
-          {label}
-        </Text>
-        <Text style={styles.rowSub}>{sub}</Text>
-      </View>
-      {right}
-    </Pressable>
-  );
-}
-
+/**
+ * Settings is a hub now, not one long column: five sections lead to their own
+ * pages (Appearance / Playback / Gestures / Sound & taste / Data & privacy),
+ * each a stack entry the hardware back button understands.
+ */
 export function SettingsScreen({
   onBack,
-  onOpenSaveTarget,
-  onReplayTutorial,
-  onResetData,
+  onOpen,
   signedIn,
-  onDeleteAccount,
-  onReplay,
-  onUnbury,
 }: {
   onBack: () => void;
-  onOpenSaveTarget: () => void;
-  onReplayTutorial: () => void;
-  onResetData: () => void;
+  onOpen: (page: "appearance" | "playback" | "gestures" | "sound" | "data") => void;
   signedIn: boolean;
-  onDeleteAccount: () => void;
-  onReplay: (container: string, allow: boolean) => void;
-  onUnbury: (trackId: string) => void;
 }) {
-  const { state, setAutoAdvance } = useStore();
+  const { state } = useStore();
 
-  const targetLabel =
-    state.saveTarget === "liked"
-      ? "Liked Songs"
-      : state.saveTarget === "discoveries"
-        ? "Discoveries"
-        : (state.playlists.find((p) => `pl:${p.id}` === state.saveTarget)?.name ??
-          "Liked Songs");
+  const motionLabel =
+    state.prefs.motion === "full" ? "Full" : state.prefs.motion === "reduced" ? "Reduced" : "Off";
 
   return (
     <View style={styles.screen}>
@@ -110,6 +119,8 @@ export function SettingsScreen({
         <Pressable
           style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
           onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="back"
         >
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
@@ -119,128 +130,61 @@ export function SettingsScreen({
         <View style={{ width: 42, height: 42 }} />
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
+        entering={FadeInDown.springify().stiffness(300).damping(30)}
         style={{ flex: 1 }}
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Settings</Text>
 
-        <Text style={styles.group}>swiping</Text>
         <Row
-          icon={state.saveTarget === "liked" ? "heart" : "folder"}
-          iconColor={colors.save}
-          label="Swipe down saves to"
-          sub={targetLabel}
-          right={<Text style={styles.rowValue}>change</Text>}
-          onPress={onOpenSaveTarget}
+          icon="droplet"
+          iconColor={state.prefs.accentMode === "custom" ? state.prefs.accentColor : colors.accentDefault}
+          label="Appearance"
+          sub={`accent · motion ${motionLabel.toLowerCase()}`}
+          chevron
+          onPress={() => onOpen("appearance")}
         />
         <Row
           icon="play"
           iconColor={colors.more}
-          label="Auto-advance"
-          sub="jump to the next song when a preview ends"
-          right={<Toggle on={state.autoAdvance} />}
-          onPress={() => setAutoAdvance(!state.autoAdvance)}
-        />
-
-        <ReplayRules onReplay={onReplay} onUnbury={onUnbury} />
-
-        <Text style={styles.group}>app</Text>
-        <Row
-          icon="external-link"
-          iconColor={colors.more}
-          label="Website"
-          sub={SITE_URL.replace(/^https?:\/\//, "")}
-          onPress={() =>
-            void Linking.openURL(SITE_URL).catch(() => {
-              Alert.alert("Could not open website", SITE_URL);
-            })
-          }
+          label="Playback"
+          sub={`auto-advance ${state.autoAdvance ? "on" : "off"} · save target`}
+          chevron
+          onPress={() => onOpen("playback")}
         />
         <Row
-          icon="globe"
+          icon="move"
+          iconColor={colors.save}
+          label="Gestures"
+          sub={`swipe distance · haptics ${state.prefs.haptics}`}
+          chevron
+          onPress={() => onOpen("gestures")}
+        />
+        <Row
+          icon="music"
           iconColor={colors.accentDefault}
-          label="Web app"
-          sub={WEB_APP_URL.replace(/^https?:\/\//, "")}
-          onPress={() =>
-            void Linking.openURL(WEB_APP_URL).catch(() => {
-              Alert.alert("Could not open web app", WEB_APP_URL);
-            })
-          }
+          label="Sound & taste"
+          sub="languages, genres, blocked artists, replays"
+          chevron
+          onPress={() => onOpen("sound")}
         />
         <Row
           icon="shield"
-          label="Privacy & terms"
-          sub="how your listening data is handled"
-          onPress={() =>
-            void Linking.openURL(`${SITE_URL}/privacy`).catch(() => {
-              Alert.alert("Could not open the privacy policy", `${SITE_URL}/privacy`);
-            })
-          }
+          label="Data & privacy"
+          sub="export, reset, delete account"
+          chevron
+          onPress={() => onOpen("data")}
         />
-        <Row
-          icon="rotate-ccw"
-          label="Replay the swipe tutorial"
-          sub="relearn the four gestures"
-          onPress={onReplayTutorial}
-        />
-        <Row
-          icon="x"
-          iconColor={colors.never}
-          label="Reset local data"
-          labelColor={colors.never}
-          sub="clears your library and history on this device"
-          onPress={() =>
-            Alert.alert(
-              "Reset local data",
-              "Clear your local library and history on this device?",
-              [
-                { text: "Cancel", style: "cancel" },
-                { text: "Reset", style: "destructive", onPress: onResetData },
-              ],
-            )
-          }
-        />
-        {signedIn && (
-          <>
-            <Text style={styles.group}>account</Text>
-            <Row
-              icon="trash-2"
-              iconColor={colors.never}
-              label="Delete my account"
-              labelColor={colors.never}
-              sub="removes your account and everything saved to it, for good"
-              onPress={() =>
-                Alert.alert(
-                  "Delete your account?",
-                  "Your profile, swipes, library and playlists are erased. This cannot be undone.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Delete",
-                      style: "destructive",
-                      onPress: onDeleteAccount,
-                    },
-                  ],
-                )
-              }
-            />
-          </>
-        )}
-      </ScrollView>
+
+        <SupportCard />
+      </Animated.ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  note: {
-    fontSize: 12.5,
-    lineHeight: 19,
-    color: colors.muted,
-    paddingHorizontal: 18,
-    paddingBottom: 10,
-  },
   screen: { flex: 1 },
   topbar: {
     flexDirection: "row",
@@ -265,7 +209,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  topBtnText: { color: colors.text, fontSize: 16 },
   body: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
   title: {
     fontFamily: fonts.display,
@@ -274,44 +217,42 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 14,
   },
-  group: {
+  support: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    gap: 8,
+  },
+  supportTitle: {
     fontFamily: fonts.bodyBold,
     fontSize: 11,
     letterSpacing: 1.8,
     textTransform: "uppercase",
     color: colors.muted,
-    marginTop: 18,
-    marginBottom: 8,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  supportSub: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.text,
+    opacity: 0.85,
+  },
+  supportRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
+  supportChip: {
     paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+    paddingVertical: 9,
+    borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.line,
-    marginBottom: 8,
+    backgroundColor: colors.surface2,
   },
-  rowIcon: { width: 24, alignItems: "center" },
-  rowLabelWrap: { flex: 1, minWidth: 0, gap: 2 },
-  rowLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.text },
-  rowSub: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },
-  rowValue: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
-  toggle: {
-    width: 42,
-    height: 25,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: "center",
+  chipOn: {
+    backgroundColor: colors.accentDefault,
+    borderColor: colors.accentDefault,
   },
-  toggleKnob: {
-    width: 19,
-    height: 19,
-    borderRadius: 999,
-    marginLeft: 2,
-    backgroundColor: "#FFFFFF",
-  },
+  chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
+  chipTextOn: { color: colors.ink },
 });
