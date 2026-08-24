@@ -183,7 +183,7 @@ function Shell() {
 
   // ----- navigation: a real stack -----
   //
-  // Screens used to be one useState â€” no history, so Android's hardware back
+  // Screens used to be one useState — no history, so Android's hardware back
   // exited the app from anywhere and "deeper navigation" was impossible.
   // Now every screen is a stack entry: pages push, back pops, tabs reset.
   const [stack, setStack] = useState<Screen[]>(["home"]);
@@ -209,7 +209,7 @@ function Shell() {
     void setAudioModeAsync({
       playsInSilentMode: true,
       // duck under phone calls instead of fighting them, keep playing when
-      // backgrounded â€” a music app that stops when you switch apps is broken
+      // backgrounded — a music app that stops when you switch apps is broken
       interruptionMode: "duckOthers",
       shouldPlayInBackground: true,
     });
@@ -227,7 +227,7 @@ function Shell() {
     | null
     | undefined;
   // The catalogue itself, not just the ids. Reading ids alone was why the app
-  // kept dealing its own bundled copies â€” hooks, creator uploads and imported
+  // kept dealing its own bundled copies — hooks, creator uploads and imported
   // songs all live server-side and never reached a card.
   const serverTracks = useQuery(anyApi.tracks.list) as
     | ServerCatalogTrack[]
@@ -248,14 +248,14 @@ function Shell() {
   const setPrefsMutation = useMutation(anyApi.library.setPrefs);
   const recordAdEvent = useMutation(anyApi.ads.recordEvent);
 
-  // live runtime config â€” the free-swipe wall is admin-tunable, pushed live
+  // live runtime config — the free-swipe wall is admin-tunable, pushed live
   const runtimeCfg = useQuery(anyApi.runtime.get) as
     | { gateFreeSwipes: number }
     | null
     | undefined;
 
   useEffect(() => {
-    // An empty catalogue is a REAL state (admin hid everything) â€” honour it
+    // An empty catalogue is a REAL state (admin hid everything) — honour it
     // rather than dealing tracks the server buried.
     if (serverTracks !== undefined && serverTracks !== null) {
       applyCatalog(serverTracks.map(toLocalCatalog));
@@ -264,7 +264,7 @@ function Shell() {
 
   /**
    * The write-ahead log. Failed mutations used to vanish; now they queue and
-   * drain here â€” on sign-in and every time the app comes to the foreground.
+   * drain here — on sign-in and every time the app comes to the foreground.
    */
   const flushOutbox = useCallback(async () => {
     if (!signedIn) return;
@@ -324,7 +324,7 @@ function Shell() {
 
   /**
    * The app is invite-only. ensureProfile refuses to create a profile until an
-   * admin approves the email, and the reason comes back in the error â€” which
+   * admin approves the email, and the reason comes back in the error — which
    * this used to swallow, so an unapproved account looked signed in and simply
    * never synced.
    */
@@ -357,8 +357,8 @@ function Shell() {
   /**
    * Google Play requires an in-app way to delete an account for any app that
    * lets you create one. This erases the server side, clears what's on the
-   * device â€” including the anonymous-swipe counter, or a deleted user would
-   * reinstall straight into their own old paywall â€” and signs out.
+   * device — including the anonymous-swipe counter, or a deleted user would
+   * reinstall straight into their own old paywall — and signs out.
    */
   const handleDeleteAccount = useCallback(() => {
     void (async () => {
@@ -417,7 +417,7 @@ function Shell() {
     [push],
   );
 
-  /** The login wall refuses BEFORE anything commits â€” web parity. */
+  /** The login wall refuses BEFORE anything commits — web parity. */
   const gateSwipe = useCallback(
     (dir: SwipeDir): boolean => {
       if (signedIn) return true;
@@ -426,7 +426,7 @@ function Shell() {
         promptAuth("Create an account to save songs and playlists across devices.");
         return false;
       }
-      // the wall's distance is live config (gateFreeSwipes) â€” admins move it
+      // the wall's distance is live config (gateFreeSwipes) — admins move it
       // without a release; 5 covers the moment before the query first answers
       if (anonSwipeCount.current >= (runtimeCfg?.gateFreeSwipes ?? FREE_SWIPES)) {
         promptAuth(
@@ -441,7 +441,7 @@ function Shell() {
     [signedIn, promptAuth, runtimeCfg],
   );
 
-  // hydrate the local store from the cloud library ONCE per signed-in user â€”
+  // hydrate the local store from the cloud library ONCE per signed-in user —
   // keyed by user id, NOT by query nullability: a transient null frame from
   // the reactive query must not re-trigger hydration (a mid-session
   // re-hydrate rebuilds the queue under the user's fingers)
@@ -582,10 +582,21 @@ function Shell() {
     ? state.history[state.history.length - 1]
     : null;
   const previous = previousEntry?.track ?? null;
-  const inDiscover = screen === "discover" && onboarded === true;
+  // the gate screens render as an early return, but this component and all
+  // its effects stay mounted — so "on the discover screen" has to mean
+  // "allowed to be here", or previews kept advancing song after song behind
+  // the waiting room with nothing visible to stop them
+  const isGated = accessState !== null && accessState !== "ok";
+  const inDiscover = screen === "discover" && onboarded === true && !isGated;
 
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
+
+  // belt and braces: if the gate appears mid-track, silence it NOW instead of
+  // waiting for the next effect cycle to notice inDiscover flipped
+  useEffect(() => {
+    if (isGated) player.pause();
+  }, [isGated, player]);
 
   // device-local volume: hardware differs, so this never syncs to the profile
   const [volume, setVolumeState] = useState(1);
@@ -644,7 +655,7 @@ function Shell() {
 
   /**
    * Move to the next window. `auto` means the window simply ran out, so once
-   * the last one is done the card is finished â€” a tap on the last one wraps
+   * the last one is done the card is finished — a tap on the last one wraps
    * instead, rather than skipping the song out from under someone.
    */
   const advanceHook = useCallback(
@@ -681,14 +692,14 @@ function Shell() {
   useEffect(() => {
     if (!inDiscover || !status.error || !onDeckId) return;
     if (Date.now() - lastSwipeAt.current < 700) return;
-    console.warn(`[audio] ${onDeckId}: ${String(status.error)} â€” skipping`);
+    console.warn(`[audio] ${onDeckId}: ${String(status.error)} — skipping`);
     lastSwipeAt.current = Date.now();
     swipe("skip");
   }, [status.error, inDiscover, onDeckId]);
 
   // A window running out moves to the next hook; the *last* window running out
   // is what "the song ended" now means. Skip still skips the song, so all four
-  // gestures stay free â€” this is why hooks advance on time and tap only.
+  // gestures stay free — this is why hooks advance on time and tap only.
   useEffect(() => {
     if (!inDiscover || !status.isLoaded || status.duration <= 0) return;
     if (Date.now() - lastSwipeAt.current < 700) return;
@@ -699,9 +710,9 @@ function Shell() {
   }, [status.currentTime, inDiscover, status.isLoaded, status.duration]);
 
   useEffect(() => {
-    // preview ended â†’ auto-advance, unless the user turned that off.
+    // preview ended → auto-advance, unless the user turned that off.
     // Gated on Discover being visible, and skipped right after any manual
-    // interaction â€” double advances make the cards/photos jump around.
+    // interaction — double advances make the cards/photos jump around.
     if (
       inDiscover &&
       status.didJustFinish &&
@@ -713,8 +724,8 @@ function Shell() {
   }, [status.didJustFinish]);
 
   // arms the interaction guard the moment a gesture COMMITS (the queue
-  // advance lands ~260ms later when the fly-out finishes â€” auto-advance and
-  // â†© must not act inside that window or they hit the wrong track)
+  // advance lands ~260ms later when the fly-out finishes — auto-advance and
+  // ↩ must not act inside that window or they hit the wrong track)
   const handleSwipeStart = useCallback(() => {
     lastSwipeAt.current = Date.now();
   }, []);
@@ -728,7 +739,7 @@ function Shell() {
       swipe(action);
       if (signedIn && track) {
         // credit the playing hook so save-rate ranking learns from mobile
-        // too â€” web does the same. Synthetic baked ids ("123:0") and the
+        // too — web does the same. Synthetic baked ids ("123:0") and the
         // "whole" fallback fail Convex validation, hence the shape guard.
         const playing = hooksRef.current[hookIndexRef.current] ?? hooksRef.current[0];
         const hookId =
@@ -743,14 +754,14 @@ function Shell() {
     [swipe, onDeck, signedIn, recordSwipeMutation, syncWrite, noteSwipeForAds],
   );
 
-  // bumping this cancels any in-flight save animation in the deck â€” going
+  // bumping this cancels any in-flight save animation in the deck — going
   // back while the disc is still sliding in would otherwise show the same
   // song twice (top card + the disc below it)
   const [backToken, setBackToken] = useState(0);
 
   const handleBack = useCallback(() => {
     if (!previousEntry) return;
-    // ignore â†© while a fly-out is mid-air: the swipe it belongs to hasn't
+    // ignore ↩ while a fly-out is mid-air: the swipe it belongs to hasn't
     // committed yet, so reverting now would target the WRONG entry
     if (Date.now() - lastSwipeAt.current < 350) return;
     lastSwipeAt.current = Date.now(); // and shield the restored card from auto-advance
@@ -891,7 +902,7 @@ function Shell() {
   const progress = timing?.progress ?? 0;
   const remaining = timing?.remaining ?? Number.POSITIVE_INFINITY;
 
-  // tutorial deals from cards 4â€“8; a thin queue tops up from the catalogue so
+  // tutorial deals from cards 4–8; a thin queue tops up from the catalogue so
   // `index % length` can't hit an empty array
   const demoTracks = useMemo(() => {
     const fromQueue = state.queue.slice(3, 8);
@@ -943,7 +954,7 @@ function Shell() {
     const copy = {
       pending: {
         title: "thank you for your interest",
-        body: "Your request is with us. We'll get back to you â€” once you're approved this screen becomes the deck.",
+        body: "Your request is with us. We'll get back to you — once you're approved this screen becomes the deck.",
       },
       rejected: {
         title: "not this round",
@@ -1083,7 +1094,7 @@ function Shell() {
             motion={state.prefs.motion}
             haptics={state.prefs.haptics}
           />
-          {/* house ad between swipes â€” music keeps playing under it */}
+          {/* house ad between swipes — music keeps playing under it */}
           {activeAd && (
             <SponsoredCard
               ad={activeAd}
