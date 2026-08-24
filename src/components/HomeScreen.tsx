@@ -22,19 +22,28 @@ function greeting(): string {
   return "good evening";
 }
 
-// Two-cell artwork mosaic for a library tile; muted placeholders when empty
+// Two-cell artwork mosaic for a library tile; a single quiet heart when empty
 function Mosaic({ tracks }: { tracks: Track[] }) {
   const cells = tracks.slice(0, 2);
+  if (cells.length === 0) {
+    return (
+      <View style={styles.mosaic}>
+        <View style={[styles.mosaicEmpty, { flex: 1 }]}>
+          <Feather name="heart" size={15} color="#3C3C48" />
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={styles.mosaic}>
       {cells.map((t) => (
         <Image key={t.id} source={{ uri: art(t.artwork, 200) }} style={styles.mosaicArt} />
       ))}
-      {Array.from({ length: 2 - cells.length }).map((_, i) => (
-        <View key={i} style={[styles.mosaicArt, styles.mosaicEmpty]}>
+      {cells.length === 1 && (
+        <View style={styles.mosaicEmpty}>
           <Feather name="heart" size={15} color="#3C3C48" />
         </View>
-      ))}
+      )}
     </View>
   );
 }
@@ -272,7 +281,12 @@ const styles = StyleSheet.create({
   tileSub: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 3 },
   rowScroll: { marginHorizontal: -20, marginBottom: 28 },
   rowScrollContent: { paddingHorizontal: 20, gap: 12 },
-  rowCard: { width: 124 },
+  rowCard: {
+    // width + flexShrink:0 — without an explicit cap a long nowrap artist
+    // name stretches the card past 124 and breaks the row's rhythm
+    width: 124,
+    flexShrink: 0,
+  },
   rowArt: {
     width: 124,
     height: 124,
