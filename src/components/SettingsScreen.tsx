@@ -10,7 +10,7 @@ import { Row } from "./settings/kit";
 
 /**
  * The Support module: what the house ads are, how often they run right now
- * (live config), and the opt-out â€” which asks once, honestly, because those
+ * (live config), and the opt-out — which asks once, honestly, because those
  * cards are what keeps an independent deck independent.
  */
 function SupportCard() {
@@ -24,8 +24,8 @@ function SupportCard() {
 
   const confirmOptOut = () => {
     Alert.alert(
-      "Before you goâ€¦",
-      "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing â€” but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
+      "Before you go…",
+      "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing — but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
       [
         {
           text: "Keep them on",
@@ -79,7 +79,7 @@ function SupportCard() {
           accessibilityState={{ selected: !optedOut }}
         >
           <Text style={[styles.chipText, !optedOut && styles.chipTextOn]}>
-            On Â· keep it independent
+            On · keep it independent
           </Text>
         </Pressable>
         <Pressable
@@ -100,16 +100,24 @@ function SupportCard() {
                 key={f.id}
                 style={[
                   styles.supportChip,
-                  state.prefs.adFrequency === f.id && styles.chipOn,
+                  state.prefs.adEveryNSwipes === null &&
+                    state.prefs.adFrequency === f.id &&
+                    styles.chipOn,
                 ]}
-                onPress={() => setPrefs({ adFrequency: f.id })}
+                onPress={() => setPrefs({ adFrequency: f.id, adEveryNSwipes: null })}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: state.prefs.adFrequency === f.id }}
+                accessibilityState={{
+                  selected:
+                    state.prefs.adEveryNSwipes === null &&
+                    state.prefs.adFrequency === f.id,
+                }}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    state.prefs.adFrequency === f.id && styles.chipTextOn,
+                    state.prefs.adEveryNSwipes === null &&
+                      state.prefs.adFrequency === f.id &&
+                      styles.chipTextOn,
                   ]}
                 >
                   {f.label}
@@ -117,8 +125,47 @@ function SupportCard() {
               </Pressable>
             ))}
           </View>
+
+          <Text style={styles.freqLabel}>your own pace</Text>
+          <View style={styles.stepper}>
+            <Pressable
+              style={styles.stepBtn}
+              onPress={() =>
+                setPrefs({
+                  adEveryNSwipes: Math.max(
+                    3,
+                    (state.prefs.adEveryNSwipes ?? 12) - 3,
+                  ),
+                })
+              }
+              accessibilityLabel="fewer swipes between cards"
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepValue}>
+              a card every{" "}
+              <Text style={styles.stepValueStrong}>
+                {state.prefs.adEveryNSwipes ?? 12}
+              </Text>{" "}
+              swipes
+            </Text>
+            <Pressable
+              style={styles.stepBtn}
+              onPress={() =>
+                setPrefs({
+                  adEveryNSwipes: Math.min(
+                    200,
+                    (state.prefs.adEveryNSwipes ?? 12) + 3,
+                  ),
+                })
+              }
+              accessibilityLabel="more swipes between cards"
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </Pressable>
+          </View>
           <Text style={styles.freqNote}>
-            your dial can only space cards further apart â€” the ceiling is set by
+            your dial can only space cards further apart — the ceiling is set by
             hooked
           </Text>
         </>
@@ -175,7 +222,7 @@ export function SettingsScreen({
           icon="droplet"
           iconColor={state.prefs.accentMode === "custom" ? state.prefs.accentColor : colors.accentDefault}
           label="Appearance"
-          sub={`accent Â· motion ${motionLabel.toLowerCase()}`}
+          sub={`accent · motion ${motionLabel.toLowerCase()}`}
           chevron
           onPress={() => onOpen("appearance")}
         />
@@ -183,7 +230,7 @@ export function SettingsScreen({
           icon="play"
           iconColor={colors.more}
           label="Playback"
-          sub={`auto-advance ${state.autoAdvance ? "on" : "off"} Â· save target`}
+          sub={`auto-advance ${state.autoAdvance ? "on" : "off"} · save target`}
           chevron
           onPress={() => onOpen("playback")}
         />
@@ -191,7 +238,7 @@ export function SettingsScreen({
           icon="move"
           iconColor={colors.save}
           label="Gestures"
-          sub={`swipe distance Â· haptics ${state.prefs.haptics}`}
+          sub={`swipe distance · haptics ${state.prefs.haptics}`}
           chevron
           onPress={() => onOpen("gestures")}
         />
@@ -281,6 +328,26 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     color: colors.muted,
   },
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 8,
+  },
+  stepBtn: {
+    width: 42,
+    height: 38,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBtnText: { fontFamily: fonts.bodyBold, fontSize: 18, color: colors.text },
+  stepValue: { fontFamily: fonts.body, fontSize: 13, color: colors.text },
+  stepValueStrong: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.text },
   freqNote: {
     fontFamily: fonts.bodyMedium,
     fontSize: 11.5,
@@ -301,4 +368,5 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
   chipTextOn: { color: colors.ink },
 });
+
 

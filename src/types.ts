@@ -23,7 +23,7 @@ export interface Track {
   audioUrl?: string;
   /** ordered best-first by the server; absent means "play the whole preview" */
   hooks?: HookWindow[];
-  /** iTunes storefronts this charted in â€” the language signal */
+  /** iTunes storefronts this charted in — the language signal */
   markets?: string[];
   /** play count normalised 0..1 against the catalogue's leader (hourly job) */
   heat?: number;

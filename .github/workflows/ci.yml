@@ -14,5 +14,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: mojibake guard
+        run: node scripts/check-mojibake.mjs App.tsx src
       - name: typecheck
         run: npx tsc --noEmit

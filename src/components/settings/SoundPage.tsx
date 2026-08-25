@@ -13,11 +13,11 @@ import {
 } from "../../data/taste";
 
 /**
- * Settings â†’ Sound & taste.
+ * Settings → Sound & taste.
  *
  * The onboarding answers used to be write-once: changing them meant replaying
  * the whole tutorial. They live here now, next to everything else that shapes
- * what the deck deals â€” including the list of blocked artists, which before
+ * what the deck deals — including the list of blocked artists, which before
  * this page existed could never be lifted at all (the empty-deck copy even
  * claimed you could).
  */

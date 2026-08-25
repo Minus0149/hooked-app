@@ -31,7 +31,7 @@ const LEGACY_KEY = "hooked.library.v1";
 export interface HistoryEntry {
   track: Track;
   action: SwipeAction;
-  // true only when a "save" actually added the track to the library â€”
+  // true only when a "save" actually added the track to the library —
   // re-liking an already-saved song must not remove it on revert
   savedToLibrary?: boolean;
 }
@@ -144,7 +144,7 @@ function shuffle<T>(arr: T[]): T[] {
  * the deck would feel like a playlist someone else made. Shuffling first and
  * biasing second keeps it unpredictable while still opening with things they
  * said they wanted. A right-swipe's genre steer works the same way at half
- * weight â€” one gesture is a nudge, not a stated preference.
+ * weight — one gesture is a nudge, not a stated preference.
  */
 function tasteSort(
   tracks: Track[],
@@ -194,7 +194,7 @@ function buildQueue(
  * Everything the deck must not deal again.
  *
  * Buried songs are absolute. Saved songs are excluded per container, because
- * "I saved this" usually means "stop showing me it" but not always â€” a playlist
+ * "I saved this" usually means "stop showing me it" but not always — a playlist
  * someone treats as a rotation should keep coming round.
  */
 function blockedIds(
@@ -232,7 +232,7 @@ function libraryIds(state: Pick<AppState, "liked" | "discoveries" | "playlists">
 /**
  * Queue invariant: every track id appears at most once. Duplicate ids break
  * React's keyed card stack ("two children with the same key") which renders
- * as duplicated/stale card images â€” this guard makes that impossible.
+ * as duplicated/stale card images — this guard makes that impossible.
  */
 function uniqueById(tracks: Track[]): Track[] {
   const seen = new Set<string>();
@@ -245,7 +245,7 @@ function uniqueById(tracks: Track[]): Track[] {
 
 /**
  * Many catalog tracks share one album's artwork. Two of those back-to-back
- * look like "the card didn't change" even when everything works â€” push
+ * look like "the card didn't change" even when everything works — push
  * same-artwork neighbors apart. Never moves index 0 (the visible card).
  */
 function spreadAlbums(tracks: Track[]): Track[] {
@@ -321,7 +321,7 @@ function reducer(state: AppState, action: Action): AppState {
 
     case "HYDRATE_REMOTE": {
       const inLibrary = blockedIds(action);
-      // keep the card the user is looking at â€” yanking queue[0] mid-session
+      // keep the card the user is looking at — yanking queue[0] mid-session
       // swaps the visible card/audio under their thumb
       const [head, ...restQ] = state.queue;
       let queue = [
@@ -331,7 +331,7 @@ function reducer(state: AppState, action: Action): AppState {
         ),
       ];
       // filter-only hydration could leave the deck thin or permanently EMPTY
-      // (SWIPE's refill is unreachable with an empty queue) â€” top it up here
+      // (SWIPE's refill is unreachable with an empty queue) — top it up here
       if (queue.length < 3) {
         const queued = new Set(queue.map((t) => t.id));
         const allowed = state.allowedIds ? new Set(state.allowedIds) : null;
@@ -366,7 +366,7 @@ function reducer(state: AppState, action: Action): AppState {
         saveTarget: action.saveTarget,
         queue: spreadAlbums(uniqueById(queue)),
         hydrated: true,
-        // keep history: clearing it killed the â†© button at every sign-in
+        // keep history: clearing it killed the ↩ button at every sign-in
       };
     }
 
@@ -435,12 +435,12 @@ function reducer(state: AppState, action: Action): AppState {
               p.id === plId ? { ...p, tracks: [current, ...p.tracks] } : p,
             );
           } else {
-            liked = [current, ...liked]; // target playlist vanished â€” fall back
+            liked = [current, ...liked]; // target playlist vanished — fall back
           }
         }
       }
       if (action.action === "more") {
-        // keep the visible peek card in place â€” re-ranking the card the user
+        // keep the visible peek card in place — re-ranking the card the user
         // can already see reads as photos jumping around
         const [peek, ...tail] = rest;
         const similar = tail.filter(
@@ -470,8 +470,8 @@ function reducer(state: AppState, action: Action): AppState {
       }
       // top up BEFORE the queue runs dry (the deck shows 3 cards), and never
       // refill with the just-swiped track, anything already queued, or
-      // recently seen songs â€” re-dealing the same card right back was the
-      // "old image appears again" glitch (and, with â†©, duplicate queue ids)
+      // recently seen songs — re-dealing the same card right back was the
+      // "old image appears again" glitch (and, with ↩, duplicate queue ids)
       if (rest.length < 3) {
         // per-playlist + global discovery rules: while THIS playlist is the
         // save target, its toggles relax the deck's exclusions; the global
@@ -583,7 +583,7 @@ function reducer(state: AppState, action: Action): AppState {
       const last = state.history[state.history.length - 1];
       if (!last) return state;
       let { liked, discoveries, playlists, neverArtists, neverTracks } = state;
-      // Going back also reverts what the swipe did, so the user can re-decide â€”
+      // Going back also reverts what the swipe did, so the user can re-decide —
       // but only if that save actually added the track (a re-like of an
       // already-saved song must not strip it from the library)
       if (last.action === "save" && last.savedToLibrary) {
@@ -596,8 +596,8 @@ function reducer(state: AppState, action: Action): AppState {
       }
       if (last.action === "never") {
         neverArtists = neverArtists.filter((a) => a !== last.track.artist);
-        // un-bury the song too â€” a left swipe buries both, so undoing it must
-        // lift both, or the â†© button quietly lied about half its promise
+        // un-bury the song too — a left swipe buries both, so undoing it must
+        // lift both, or the ↩ button quietly lied about half its promise
         neverTracks = neverTracks.filter((id) => id !== last.track.id);
       }
       return {
@@ -654,7 +654,7 @@ function reducer(state: AppState, action: Action): AppState {
       };
 
     case "SET_PREFS": {
-      // merge only the keys actually present â€” coercePrefs fills defaults,
+      // merge only the keys actually present — coercePrefs fills defaults,
       // and using it here would reset every untouched setting
       const patch = Object.fromEntries(
         Object.entries(action.prefs).filter(([, v]) => v !== undefined),
@@ -759,7 +759,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       let raw = await AsyncStorage.getItem(PERSIST_KEY);
-      if (!raw) raw = await AsyncStorage.getItem(LEGACY_KEY); // one-way v1 â†’ v2
+      if (!raw) raw = await AsyncStorage.getItem(LEGACY_KEY); // one-way v1 → v2
       loaded.current = true;
       let payload: Persisted = {};
       try {
@@ -769,7 +769,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       dispatch({ type: "HYDRATE", payload });
       if (raw && (await AsyncStorage.getItem(LEGACY_KEY))) {
-        await AsyncStorage.removeItem(LEGACY_KEY); // migration done â€” stop reading it forever
+        await AsyncStorage.removeItem(LEGACY_KEY); // migration done — stop reading it forever
       }
     })();
   }, []);
@@ -824,8 +824,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   ]);
 
   // CRITICAL: actions are memoized once (dispatch is stable). They must NOT
-  // be recreated per state change â€” effects depend on these functions, and
-  // changing identities re-fire the effects, which dispatch again â†’ an
+  // be recreated per state change — effects depend on these functions, and
+  // changing identities re-fire the effects, which dispatch again → an
   // infinite "Maximum update depth exceeded" render loop.
   const actions = useMemo(
     () => ({

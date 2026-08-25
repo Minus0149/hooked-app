@@ -197,13 +197,13 @@ export function LibraryScreen({
             <Feather name={icon} size={10.5} color={accent} />{" "}
             {playlistId ? "PLAYLIST" : "COLLECTION"}
             {isSaveTarget && (
-              <Text style={{ color: colors.save }}> Â· saving here</Text>
+              <Text style={{ color: colors.save }}> · saving here</Text>
             )}
           </Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.sub}>
             {tracks.length} {tracks.length === 1 ? "song" : "songs"}
-            {tracks.length > 0 && ` Â· ~${totalMinutes(tracks)} min of music`}
+            {tracks.length > 0 && ` · ~${totalMinutes(tracks)} min of music`}
           </Text>
         </View>
       </View>
@@ -248,7 +248,7 @@ export function LibraryScreen({
           >
             <Feather name="settings" size={14} color={accent} />
             <Text style={styles.rulesLabel}>
-              Discovery rules Â·{" "}
+              Discovery rules ·{" "}
               {rules.allowRepeats || rules.includeBuried || rules.includeBlockedArtists
                 ? [
                     rules.allowRepeats && "repeats",
@@ -256,7 +256,7 @@ export function LibraryScreen({
                     rules.includeBlockedArtists && "blocked",
                   ]
                     .filter(Boolean)
-                    .join(" Â· ") + " allowed"
+                    .join(" · ") + " allowed"
                 : "strict"}
             </Text>
             <Feather name={showRules ? "chevron-up" : "chevron-down"} size={14} color={colors.muted} />
@@ -309,7 +309,7 @@ export function LibraryScreen({
             <Text style={{ color: accent, fontFamily: fonts.bodyBold }}>
               Discover into this
             </Text>{" "}
-            â€” every song you swipe down will land right here.
+            — every song you swipe down will land right here.
           </Text>
         </Animated.View>
       )}

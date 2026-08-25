@@ -9,7 +9,7 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 import { colors, fonts, radii } from "../../design/tokens";
 
-/** Animated track+knob switch matching web's .toggle â€” save-green when on. */
+/** Animated track+knob switch matching web's .toggle — save-green when on. */
 export function Toggle({ on }: { on: boolean }) {
   const v = useSharedValue(on ? 1 : 0);
 
