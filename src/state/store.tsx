@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useContext,
   useEffect,
@@ -31,7 +31,7 @@ const LEGACY_KEY = "hooked.library.v1";
 export interface HistoryEntry {
   track: Track;
   action: SwipeAction;
-  // true only when a "save" actually added the track to the library —
+  // true only when a "save" actually added the track to the library â€”
   // re-liking an already-saved song must not remove it on revert
   savedToLibrary?: boolean;
 }
@@ -60,6 +60,12 @@ export interface AppState {
   taste: TastePrefs;
   // how the app should look and behave (Settings → synced to the profile)
   prefs: UserPrefs;
+  /**
+   * The deck's memory: per track, when it was last dealt and how many times
+   * it was skipped. Two skips auto-bury the song (song only — the artist is
+   * untouched); anything seen in the last 7 days waits its turn.
+   */
+  deckMemory: Record<string, { seen: number; skips: number }>;
 }
 
 type Persisted = Partial<
@@ -75,6 +81,7 @@ type Persisted = Partial<
     | "saveTarget"
     | "boostGenres"
     | "autoAdvance"
+    | "deckMemory"
   >
 > & { prefs?: Partial<UserPrefs> };
 
@@ -87,6 +94,13 @@ type Action =
   | { type: "SET_REPLAY"; container: string; allow: boolean }
   | { type: "UNBURY"; trackId: string }
   | { type: "UNBLOCK_ARTIST"; artist: string }
+  | {
+      type: "PLAYLIST_RULES";
+      id: string;
+      allowRepeats?: boolean;
+      includeBuried?: boolean;
+      includeBlockedArtists?: boolean;
+    }
   | { type: "SET_TASTE"; taste: TastePrefs }
   | { type: "SET_PREFS"; prefs: Partial<UserPrefs> }
   | { type: "CREATE_PLAYLIST"; playlist: Playlist }
@@ -130,7 +144,7 @@ function shuffle<T>(arr: T[]): T[] {
  * the deck would feel like a playlist someone else made. Shuffling first and
  * biasing second keeps it unpredictable while still opening with things they
  * said they wanted. A right-swipe's genre steer works the same way at half
- * weight — one gesture is a nudge, not a stated preference.
+ * weight â€” one gesture is a nudge, not a stated preference.
  */
 function tasteSort(
   tracks: Track[],
@@ -180,19 +194,24 @@ function buildQueue(
  * Everything the deck must not deal again.
  *
  * Buried songs are absolute. Saved songs are excluded per container, because
- * "I saved this" usually means "stop showing me it" but not always — a playlist
+ * "I saved this" usually means "stop showing me it" but not always â€” a playlist
  * someone treats as a rotation should keep coming round.
  */
 function blockedIds(
   state: Pick<
     AppState,
     "liked" | "discoveries" | "playlists" | "neverTracks" | "replayContainers"
-  >,
+  > & { prefs?: Partial<UserPrefs> | null },
 ): Set<string> {
   const allow = new Set(state.replayContainers);
+  // global discovery rules relax the defaults for everyone
+  const prefs = (state.prefs ?? {}) as Partial<UserPrefs>;
+  if (prefs.includeBuried) return allow;
   const blocked = new Set(state.neverTracks);
-  if (!allow.has("liked")) for (const t of state.liked) blocked.add(t.id);
-  if (!allow.has("discoveries")) for (const t of state.discoveries) blocked.add(t.id);
+  if (!prefs.allowRepeats) {
+    if (!allow.has("liked")) for (const t of state.liked) blocked.add(t.id);
+    if (!allow.has("discoveries")) for (const t of state.discoveries) blocked.add(t.id);
+  }
   for (const p of state.playlists) {
     if (allow.has(`pl:${p.id}`)) continue;
     for (const t of p.tracks) blocked.add(t.id);
@@ -213,7 +232,7 @@ function libraryIds(state: Pick<AppState, "liked" | "discoveries" | "playlists">
 /**
  * Queue invariant: every track id appears at most once. Duplicate ids break
  * React's keyed card stack ("two children with the same key") which renders
- * as duplicated/stale card images — this guard makes that impossible.
+ * as duplicated/stale card images â€” this guard makes that impossible.
  */
 function uniqueById(tracks: Track[]): Track[] {
   const seen = new Set<string>();
@@ -226,7 +245,7 @@ function uniqueById(tracks: Track[]): Track[] {
 
 /**
  * Many catalog tracks share one album's artwork. Two of those back-to-back
- * look like "the card didn't change" even when everything works — push
+ * look like "the card didn't change" even when everything works â€” push
  * same-artwork neighbors apart. Never moves index 0 (the visible card).
  */
 function spreadAlbums(tracks: Track[]): Track[] {
@@ -256,6 +275,7 @@ const initialState: AppState = {
   boostGenres: [],
   saveTarget: "liked",
   autoAdvance: true,
+  deckMemory: {},
   hydrated: false,
 };
 
@@ -281,6 +301,7 @@ function reducer(state: AppState, action: Action): AppState {
         boostGenres: action.payload.boostGenres ?? [],
         saveTarget: action.payload.saveTarget ?? "liked",
         autoAdvance: action.payload.autoAdvance ?? true,
+        deckMemory: action.payload.deckMemory ?? {},
         hydrated: true,
       };
       const inLibrary = libraryIds(merged);
@@ -300,7 +321,7 @@ function reducer(state: AppState, action: Action): AppState {
 
     case "HYDRATE_REMOTE": {
       const inLibrary = blockedIds(action);
-      // keep the card the user is looking at — yanking queue[0] mid-session
+      // keep the card the user is looking at â€” yanking queue[0] mid-session
       // swaps the visible card/audio under their thumb
       const [head, ...restQ] = state.queue;
       let queue = [
@@ -310,7 +331,7 @@ function reducer(state: AppState, action: Action): AppState {
         ),
       ];
       // filter-only hydration could leave the deck thin or permanently EMPTY
-      // (SWIPE's refill is unreachable with an empty queue) — top it up here
+      // (SWIPE's refill is unreachable with an empty queue) â€” top it up here
       if (queue.length < 3) {
         const queued = new Set(queue.map((t) => t.id));
         const allowed = state.allowedIds ? new Set(state.allowedIds) : null;
@@ -345,7 +366,7 @@ function reducer(state: AppState, action: Action): AppState {
         saveTarget: action.saveTarget,
         queue: spreadAlbums(uniqueById(queue)),
         hydrated: true,
-        // keep history: clearing it killed the ↩ button at every sign-in
+        // keep history: clearing it killed the â†© button at every sign-in
       };
     }
 
@@ -371,7 +392,7 @@ function reducer(state: AppState, action: Action): AppState {
       const rest = buildQueue(
         action.tracks,
         exclude,
-        state.neverArtists,
+        state.prefs.includeBlockedArtists ? [] : state.neverArtists,
         state.taste,
         state.boostGenres,
       );
@@ -414,12 +435,12 @@ function reducer(state: AppState, action: Action): AppState {
               p.id === plId ? { ...p, tracks: [current, ...p.tracks] } : p,
             );
           } else {
-            liked = [current, ...liked]; // target playlist vanished — fall back
+            liked = [current, ...liked]; // target playlist vanished â€” fall back
           }
         }
       }
       if (action.action === "more") {
-        // keep the visible peek card in place — re-ranking the card the user
+        // keep the visible peek card in place â€” re-ranking the card the user
         // can already see reads as photos jumping around
         const [peek, ...tail] = rest;
         const similar = tail.filter(
@@ -449,16 +470,40 @@ function reducer(state: AppState, action: Action): AppState {
       }
       // top up BEFORE the queue runs dry (the deck shows 3 cards), and never
       // refill with the just-swiped track, anything already queued, or
-      // recently seen songs — re-dealing the same card right back was the
-      // "old image appears again" glitch (and, with ↩, duplicate queue ids)
+      // recently seen songs â€” re-dealing the same card right back was the
+      // "old image appears again" glitch (and, with â†©, duplicate queue ids)
       if (rest.length < 3) {
-        const blocked = blockedIds({
-          liked,
-          discoveries,
-          playlists,
-          neverTracks,
-          replayContainers: state.replayContainers,
-        });
+        // per-playlist + global discovery rules: while THIS playlist is the
+        // save target, its toggles relax the deck's exclusions; the global
+        // Settings toggles are the default strictness for everything else
+        const targetId = state.saveTarget.startsWith("pl:")
+          ? state.saveTarget.slice(3)
+          : null;
+        const targetPl = targetId
+          ? playlists.find((p) => p.id === targetId)
+          : null;
+        const repeatsOk =
+          state.replayContainers.includes(state.saveTarget) ||
+          (targetPl?.allowRepeats ?? false) ||
+          state.prefs.allowRepeats;
+        const buriedOk =
+          (targetPl?.includeBuried ?? false) || state.prefs.includeBuried;
+        const artistsOk =
+          (targetPl?.includeBlockedArtists ?? false) ||
+          state.prefs.includeBlockedArtists;
+
+        // library exclusions, honouring global replay rules and the target's
+        const libraryBlock = new Set<string>();
+        if (!state.replayContainers.includes("liked"))
+          for (const t of liked) libraryBlock.add(t.id);
+        if (!state.replayContainers.includes("discoveries"))
+          for (const t of discoveries) libraryBlock.add(t.id);
+        for (const p of playlists) {
+          if (targetPl && p.id === targetPl.id && p.allowRepeats) continue;
+          if (state.replayContainers.includes(`pl:${p.id}`)) continue;
+          for (const t of p.tracks) libraryBlock.add(t.id);
+        }
+
         const allowed = state.allowedIds ? new Set(state.allowedIds) : null;
         const avoid = new Set([
           current.id,
@@ -466,14 +511,25 @@ function reducer(state: AppState, action: Action): AppState {
           ...state.history.slice(-12).map((h) => h.track.id),
         ]);
         // Never reach for a song the listener buried or already keeps, nor one
-        // the admin hid. Running low relaxes *recency*, not those. Refills
-        // honour the taste answers and the right-swipe steer too.
-        const pickable = state.catalog.filter(
-          (t) =>
-            (!allowed || allowed.has(t.id)) &&
-            !blocked.has(t.id) &&
-            !neverArtists.includes(t.artist),
+        // the admin hid — unless rules say otherwise. ALSO: anything dealt in
+        // the last 7 days waits its turn (deck memory); if that starves the
+        // deck, recency relaxes first, never the hard filters.
+        const WEEK = 7 * 86_400_000;
+        const baseFilters = (t: Track) =>
+          (!allowed || allowed.has(t.id)) &&
+          (buriedOk || !neverTracks.includes(t.id)) &&
+          (artistsOk || !neverArtists.includes(t.artist)) &&
+          (repeatsOk || !libraryBlock.has(t.id));
+        const seenTooRecently = (t: Track) => {
+          const m = state.deckMemory[t.id];
+          return m !== undefined && Date.now() - m.seen < WEEK;
+        };
+        let pickable = state.catalog.filter(
+          (t) => baseFilters(t) && !seenTooRecently(t),
         );
+        if (pickable.length < 3) {
+          pickable = state.catalog.filter(baseFilters);
+        }
         const fresh = pickable.filter((t) => !avoid.has(t.id));
         const pool = fresh.length >= 3 ? fresh : pickable.filter((t) => t.id !== current.id);
         rest = [
@@ -485,6 +541,27 @@ function reducer(state: AppState, action: Action): AppState {
               : shuffle(pool)),
         ];
       }
+      // deck memory: every dealt card is remembered — skips count toward the
+      // two-strike auto-bury (song only; the artist stays dealable)
+      const mem: typeof state.deckMemory = {};
+      for (const [id, m] of Object.entries(state.deckMemory)) {
+        if (Date.now() - m.seen < 90 * 86_400_000) mem[id] = m; // prune >90d
+      }
+      const prev = mem[current.id] ?? { seen: 0, skips: 0 };
+      mem[current.id] = {
+        seen: Date.now(),
+        skips: action.action === "skip" ? prev.skips + 1 : prev.skips,
+      };
+      if (
+        action.action === "skip" &&
+        mem[current.id].skips >= 2 &&
+        !neverTracks.includes(current.id)
+      ) {
+        // skipped twice: that's the listener voting with their thumb. Bury the
+        // SONG — it lands in the Buried list where it can be unburied.
+        neverTracks = [...neverTracks, current.id];
+      }
+
       return {
         ...state,
         queue: spreadAlbums(uniqueById(rest)),
@@ -498,6 +575,7 @@ function reducer(state: AppState, action: Action): AppState {
         neverArtists,
         neverTracks,
         boostGenres,
+        deckMemory: mem,
       };
     }
 
@@ -505,7 +583,7 @@ function reducer(state: AppState, action: Action): AppState {
       const last = state.history[state.history.length - 1];
       if (!last) return state;
       let { liked, discoveries, playlists, neverArtists, neverTracks } = state;
-      // Going back also reverts what the swipe did, so the user can re-decide —
+      // Going back also reverts what the swipe did, so the user can re-decide â€”
       // but only if that save actually added the track (a re-like of an
       // already-saved song must not strip it from the library)
       if (last.action === "save" && last.savedToLibrary) {
@@ -518,8 +596,8 @@ function reducer(state: AppState, action: Action): AppState {
       }
       if (last.action === "never") {
         neverArtists = neverArtists.filter((a) => a !== last.track.artist);
-        // un-bury the song too — a left swipe buries both, so undoing it must
-        // lift both, or the ↩ button quietly lied about half its promise
+        // un-bury the song too â€” a left swipe buries both, so undoing it must
+        // lift both, or the â†© button quietly lied about half its promise
         neverTracks = neverTracks.filter((id) => id !== last.track.id);
       }
       return {
@@ -568,7 +646,7 @@ function reducer(state: AppState, action: Action): AppState {
           buildQueue(
             state.catalog,
             blockedIds(state),
-            state.neverArtists,
+            state.prefs.includeBlockedArtists ? [] : state.neverArtists,
             action.taste,
             state.boostGenres,
           ),
@@ -576,7 +654,7 @@ function reducer(state: AppState, action: Action): AppState {
       };
 
     case "SET_PREFS": {
-      // merge only the keys actually present — coercePrefs fills defaults,
+      // merge only the keys actually present â€” coercePrefs fills defaults,
       // and using it here would reset every untouched setting
       const patch = Object.fromEntries(
         Object.entries(action.prefs).filter(([, v]) => v !== undefined),
@@ -588,6 +666,11 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         neverTracks: state.neverTracks.filter((id) => id !== action.trackId),
+        // forgive the memory too, or the two-strike rule re-buries it
+        deckMemory: {
+          ...state.deckMemory,
+          [action.trackId]: { seen: 0, skips: 0 },
+        },
       };
 
     case "UNBLOCK_ARTIST": {
@@ -596,6 +679,16 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         neverArtists: state.neverArtists.filter((a) => a !== action.artist),
+      };
+    }
+
+    case "PLAYLIST_RULES": {
+      const { id, ...rules } = action;
+      return {
+        ...state,
+        playlists: state.playlists.map((p) =>
+          p.id === id ? { ...p, ...rules } : p,
+        ),
       };
     }
 
@@ -640,6 +733,7 @@ interface StoreValue {
   setPrefs: (prefs: Partial<UserPrefs>) => void;
   unbury: (trackId: string) => void;
   unblockArtist: (artist: string) => void;
+  updatePlaylistRules: (id: string, rules: { allowRepeats?: boolean; includeBuried?: boolean; includeBlockedArtists?: boolean }) => void;
   hydrateRemote: (payload: {
     liked: Track[];
     discoveries: Track[];
@@ -665,7 +759,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       let raw = await AsyncStorage.getItem(PERSIST_KEY);
-      if (!raw) raw = await AsyncStorage.getItem(LEGACY_KEY); // one-way v1 → v2
+      if (!raw) raw = await AsyncStorage.getItem(LEGACY_KEY); // one-way v1 â†’ v2
       loaded.current = true;
       let payload: Persisted = {};
       try {
@@ -675,7 +769,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       dispatch({ type: "HYDRATE", payload });
       if (raw && (await AsyncStorage.getItem(LEGACY_KEY))) {
-        await AsyncStorage.removeItem(LEGACY_KEY); // migration done — stop reading it forever
+        await AsyncStorage.removeItem(LEGACY_KEY); // migration done â€” stop reading it forever
       }
     })();
   }, []);
@@ -694,6 +788,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       saveTarget,
       boostGenres,
       autoAdvance,
+      deckMemory,
     } = state;
     void AsyncStorage.setItem(
       PERSIST_KEY,
@@ -709,6 +804,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         saveTarget,
         boostGenres,
         autoAdvance,
+        deckMemory,
       }),
     );
   }, [
@@ -723,12 +819,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     state.saveTarget,
     state.boostGenres,
     state.autoAdvance,
+    state.deckMemory,
     state.hydrated,
   ]);
 
   // CRITICAL: actions are memoized once (dispatch is stable). They must NOT
-  // be recreated per state change — effects depend on these functions, and
-  // changing identities re-fire the effects, which dispatch again → an
+  // be recreated per state change â€” effects depend on these functions, and
+  // changing identities re-fire the effects, which dispatch again â†’ an
   // infinite "Maximum update depth exceeded" render loop.
   const actions = useMemo(
     () => ({
@@ -740,6 +837,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_REPLAY", container, allow }),
       unbury: (trackId: string) => dispatch({ type: "UNBURY", trackId }),
       unblockArtist: (artist: string) => dispatch({ type: "UNBLOCK_ARTIST", artist }),
+      updatePlaylistRules: (id: string, rules: { allowRepeats?: boolean; includeBuried?: boolean; includeBlockedArtists?: boolean }) => dispatch({ type: "PLAYLIST_RULES", id, ...rules }),
       setTaste: (taste: TastePrefs) => dispatch({ type: "SET_TASTE", taste }),
       setPrefs: (prefs: Partial<UserPrefs>) => dispatch({ type: "SET_PREFS", prefs }),
       setSaveTarget: (target: SaveTarget) => dispatch({ type: "SET_SAVE_TARGET", target }),
@@ -781,3 +879,10 @@ export function useStore(): StoreValue {
   if (!ctx) throw new Error("useStore must be used inside StoreProvider");
   return ctx;
 }
+
+
+
+
+
+
+

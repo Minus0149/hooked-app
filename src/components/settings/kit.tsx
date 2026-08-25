@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+﻿import { useEffect, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
@@ -9,7 +9,7 @@ import Animated, {
 import { Feather } from "@expo/vector-icons";
 import { colors, fonts, radii } from "../../design/tokens";
 
-/** Animated track+knob switch matching web's .toggle — save-green when on. */
+/** Animated track+knob switch matching web's .toggle â€” save-green when on. */
 export function Toggle({ on }: { on: boolean }) {
   const v = useSharedValue(on ? 1 : 0);
 
@@ -173,3 +173,4 @@ const segStyles = StyleSheet.create({
   },
   label: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
 });
+

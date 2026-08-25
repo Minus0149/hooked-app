@@ -529,15 +529,29 @@ function Shell() {
   const noteSwipeForAds = useCallback(() => {
     // handleSwipe is only reachable from the deck, so being here means Discover
     swipeCounterAd.current += 1;
+    // the listener's dial can only space cards further apart
+    const scale =
+      state.prefs.adFrequency === "often"
+        ? 0.5
+        : state.prefs.adFrequency === "rarely"
+          ? 2
+          : 1;
+    const effective =
+      adsConfig == null
+        ? null
+        : {
+            ...adsConfig,
+            everyNSwipes: Math.max(3, Math.round(adsConfig.everyNSwipes * scale)),
+          };
     const due = shouldAskForAd({
       swipesSinceAd: swipeCounterAd.current,
       now: Date.now(),
       lastAdAt: lastAdAt.current,
       optedOut: state.prefs.adsOptOut,
-      config: adsConfig,
+      config: effective,
     });
     if (due) setAdDue(true); // nextAd decides authoritatively
-  }, [state.prefs.adsOptOut, adsConfig]);
+  }, [state.prefs.adsOptOut, state.prefs.adFrequency, adsConfig]);
 
   const adCandidate = useQuery(
     anyApi.ads.nextAd,
@@ -821,16 +835,24 @@ function Shell() {
   );
 
   const handleCreatePlaylist = useCallback(
-    async (name: string, accent: string): Promise<string> => {
+    async (
+      name: string,
+      accent: string,
+      rules?: {
+        allowRepeats?: boolean;
+        includeBuried?: boolean;
+        includeBlockedArtists?: boolean;
+      },
+    ): Promise<string> => {
       let id = `local-${Date.now()}`;
       if (signedIn) {
         try {
-          id = String(await createPlaylistMutation({ name, accent }));
+          id = String(await createPlaylistMutation({ name, accent, ...rules }));
         } catch {
           /* keep local id */
         }
       }
-      createPlaylist({ id, name, accent, tracks: [] });
+      createPlaylist({ id, name, accent, tracks: [], ...rules });
       return id;
     },
     [signedIn, createPlaylistMutation, createPlaylist],
@@ -1301,4 +1323,6 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 });
+
+
 

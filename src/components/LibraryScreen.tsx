@@ -1,4 +1,4 @@
-import { memo } from "react";
+﻿import { memo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -11,6 +11,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeOutLeft } from "react-native-reanimated";
+import { useMutation } from "convex/react";
+import { anyApi } from "convex/server";
 import { useStore } from "../state/store";
 import type { LibraryContainer, Track } from "../types";
 import { colors, fonts, mixHex, radii, withAlpha } from "../design/tokens";
@@ -106,13 +108,20 @@ export function LibraryScreen({
   onDeletePlaylist: (id: string) => void;
   onDiscoverInto: (container: LibraryContainer) => void;
 }) {
-  const { state } = useStore();
+  const { state, updatePlaylistRules } = useStore();
+  const updateRulesOnServer = useMutation(anyApi.library.updatePlaylistRules);
+  const [showRules, setShowRules] = useState(false);
 
   let title: string;
   let tracks: Track[];
   let accent = colors.accentDefault;
   let playlistId: string | null = null;
   let icon: keyof typeof Feather.glyphMap = "folder";
+  let rules: {
+    allowRepeats: boolean;
+    includeBuried: boolean;
+    includeBlockedArtists: boolean;
+  } | null = null;
 
   if (container === "liked") {
     title = "Liked Songs";
@@ -129,6 +138,11 @@ export function LibraryScreen({
     title = pl?.name ?? "Playlist";
     tracks = pl?.tracks ?? [];
     accent = pl?.accent ?? accent;
+    rules = {
+      allowRepeats: pl?.allowRepeats ?? false,
+      includeBuried: pl?.includeBuried ?? false,
+      includeBlockedArtists: pl?.includeBlockedArtists ?? false,
+    };
   }
 
   const collage = tracks.slice(0, 4);
@@ -183,13 +197,13 @@ export function LibraryScreen({
             <Feather name={icon} size={10.5} color={accent} />{" "}
             {playlistId ? "PLAYLIST" : "COLLECTION"}
             {isSaveTarget && (
-              <Text style={{ color: colors.save }}> · saving here</Text>
+              <Text style={{ color: colors.save }}> Â· saving here</Text>
             )}
           </Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.sub}>
             {tracks.length} {tracks.length === 1 ? "song" : "songs"}
-            {tracks.length > 0 && ` · ~${totalMinutes(tracks)} min of music`}
+            {tracks.length > 0 && ` Â· ~${totalMinutes(tracks)} min of music`}
           </Text>
         </View>
       </View>
@@ -224,6 +238,67 @@ export function LibraryScreen({
         </Pressable>
       </View>
 
+      {playlistId && rules && (
+        <>
+          <Pressable
+            style={styles.rulesRow}
+            onPress={() => setShowRules((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel="discovery rules"
+          >
+            <Feather name="settings" size={14} color={accent} />
+            <Text style={styles.rulesLabel}>
+              Discovery rules Â·{" "}
+              {rules.allowRepeats || rules.includeBuried || rules.includeBlockedArtists
+                ? [
+                    rules.allowRepeats && "repeats",
+                    rules.includeBuried && "buried",
+                    rules.includeBlockedArtists && "blocked",
+                  ]
+                    .filter(Boolean)
+                    .join(" Â· ") + " allowed"
+                : "strict"}
+            </Text>
+            <Feather name={showRules ? "chevron-up" : "chevron-down"} size={14} color={colors.muted} />
+          </Pressable>
+          {showRules &&
+            (
+              [
+                ["allowRepeats", "Allow songs to reappear", "saved songs can come back around"],
+                ["includeBuried", "Deal buried songs", "left-swiped songs can return"],
+                ["includeBlockedArtists", "Deal blocked artists", "blocked artists can return"],
+              ] as const
+            ).map(([key, label, sub]) => (
+              <Pressable
+                key={key}
+                style={styles.ruleRow}
+                onPress={() => {
+                  const next = !rules[key];
+                  updatePlaylistRules(playlistId!, { [key]: next });
+                  void updateRulesOnServer({ playlistId, [key]: next } as never).catch(
+                    () => undefined,
+                  );
+                }}
+                accessibilityRole="switch"
+                accessibilityState={{ selected: rules[key] }}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.ruleTitle}>{label}</Text>
+                  <Text style={styles.ruleSub}>{sub}</Text>
+                </View>
+                <View style={[styles.toggle, rules[key] && styles.toggleOn]}>
+                  <View style={[styles.knob, rules[key] && styles.knobOn]} />
+                </View>
+              </Pressable>
+            ))}
+          {showRules && (
+            <Text style={styles.rulesNote}>
+              Applies while this playlist is your swipe-down target.
+            </Text>
+          )}
+        </>
+      )}
+
       {tracks.length === 0 && (
         <Animated.View
           entering={FadeInDown.delay(80).springify().stiffness(260).damping(26)}
@@ -234,7 +309,7 @@ export function LibraryScreen({
             <Text style={{ color: accent, fontFamily: fonts.bodyBold }}>
               Discover into this
             </Text>{" "}
-            — every song you swipe down will land right here.
+            â€” every song you swipe down will land right here.
           </Text>
         </Animated.View>
       )}
@@ -296,6 +371,52 @@ export function LibraryScreen({
 }
 
 const styles = StyleSheet.create({
+  rulesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  rulesLabel: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text, flex: 1 },
+  ruleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 6,
+  },
+  ruleTitle: { fontFamily: fonts.bodySemiBold, fontSize: 13.5, color: colors.text },
+  ruleSub: { fontFamily: fonts.bodyMedium, fontSize: 11.5, color: colors.muted, marginTop: 2 },
+  rulesNote: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.muted, marginBottom: 8 },
+  toggle: {
+    width: 42,
+    height: 25,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface2,
+    justifyContent: "center",
+  },
+  toggleOn: { backgroundColor: colors.save, borderColor: colors.save },
+  knob: {
+    width: 19,
+    height: 19,
+    borderRadius: 999,
+    marginLeft: 2,
+    backgroundColor: "#FFFFFF",
+  },
+  knobOn: { transform: [{ translateX: 17 }] },
   screen: { flex: 1 },
   heroGlow: {
     position: "absolute",
@@ -429,3 +550,4 @@ const styles = StyleSheet.create({
   },
   rowBtn: { padding: 6 },
 });
+

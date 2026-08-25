@@ -1,15 +1,16 @@
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+﻿import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useMutation, useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { useStore } from "../state/store";
+import { AD_FREQUENCIES } from "../data/prefs";
 import { colors, fonts, radii } from "../design/tokens";
 import { Row } from "./settings/kit";
 
 /**
  * The Support module: what the house ads are, how often they run right now
- * (live config), and the opt-out — which asks once, honestly, because those
+ * (live config), and the opt-out â€” which asks once, honestly, because those
  * cards are what keeps an independent deck independent.
  */
 function SupportCard() {
@@ -23,8 +24,8 @@ function SupportCard() {
 
   const confirmOptOut = () => {
     Alert.alert(
-      "Before you go…",
-      "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing — but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
+      "Before you goâ€¦",
+      "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing â€” but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
       [
         {
           text: "Keep them on",
@@ -78,7 +79,7 @@ function SupportCard() {
           accessibilityState={{ selected: !optedOut }}
         >
           <Text style={[styles.chipText, !optedOut && styles.chipTextOn]}>
-            On · keep it independent
+            On Â· keep it independent
           </Text>
         </Pressable>
         <Pressable
@@ -90,6 +91,38 @@ function SupportCard() {
           <Text style={[styles.chipText, optedOut && styles.chipTextOn]}>Off</Text>
         </Pressable>
       </View>
+      {!optedOut && (
+        <>
+          <Text style={styles.freqLabel}>how often</Text>
+          <View style={styles.supportRow}>
+            {AD_FREQUENCIES.map((f) => (
+              <Pressable
+                key={f.id}
+                style={[
+                  styles.supportChip,
+                  state.prefs.adFrequency === f.id && styles.chipOn,
+                ]}
+                onPress={() => setPrefs({ adFrequency: f.id })}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: state.prefs.adFrequency === f.id }}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    state.prefs.adFrequency === f.id && styles.chipTextOn,
+                  ]}
+                >
+                  {f.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.freqNote}>
+            your dial can only space cards further apart â€” the ceiling is set by
+            hooked
+          </Text>
+        </>
+      )}
     </View>
   );
 }
@@ -142,7 +175,7 @@ export function SettingsScreen({
           icon="droplet"
           iconColor={state.prefs.accentMode === "custom" ? state.prefs.accentColor : colors.accentDefault}
           label="Appearance"
-          sub={`accent · motion ${motionLabel.toLowerCase()}`}
+          sub={`accent Â· motion ${motionLabel.toLowerCase()}`}
           chevron
           onPress={() => onOpen("appearance")}
         />
@@ -150,7 +183,7 @@ export function SettingsScreen({
           icon="play"
           iconColor={colors.more}
           label="Playback"
-          sub={`auto-advance ${state.autoAdvance ? "on" : "off"} · save target`}
+          sub={`auto-advance ${state.autoAdvance ? "on" : "off"} Â· save target`}
           chevron
           onPress={() => onOpen("playback")}
         />
@@ -158,7 +191,7 @@ export function SettingsScreen({
           icon="move"
           iconColor={colors.save}
           label="Gestures"
-          sub={`swipe distance · haptics ${state.prefs.haptics}`}
+          sub={`swipe distance Â· haptics ${state.prefs.haptics}`}
           chevron
           onPress={() => onOpen("gestures")}
         />
@@ -241,6 +274,18 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   supportRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
+  freqLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    letterSpacing: 1.8,
+    textTransform: "uppercase",
+    color: colors.muted,
+  },
+  freqNote: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11.5,
+    color: colors.muted,
+  },
   supportChip: {
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -256,3 +301,4 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
   chipTextOn: { color: colors.ink },
 });
+

@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SettingsPage } from "./SettingsPage";
-import { GroupLabel, Row, Segmented } from "./kit";
+import { GroupLabel, Row, Segmented, Toggle } from "./kit";
 import { ReplayRules } from "../ReplayRules";
 import { useStore } from "../../state/store";
 import { colors, fonts } from "../../design/tokens";
@@ -13,11 +13,11 @@ import {
 } from "../../data/taste";
 
 /**
- * Settings → Sound & taste.
+ * Settings â†’ Sound & taste.
  *
  * The onboarding answers used to be write-once: changing them meant replaying
  * the whole tutorial. They live here now, next to everything else that shapes
- * what the deck deals — including the list of blocked artists, which before
+ * what the deck deals â€” including the list of blocked artists, which before
  * this page existed could never be lifted at all (the empty-deck copy even
  * claimed you could).
  */
@@ -32,7 +32,7 @@ export function SoundPage({
   onUnbury: (trackId: string) => void;
   onUnblockArtist: (artist: string) => void;
 }) {
-  const { state, setTaste } = useStore();
+  const { state, setTaste, setPrefs } = useStore();
   const [showBlocked, setShowBlocked] = useState(false);
   const options = useMemo(
     () => availableTasteOptions(state.catalog),
@@ -82,6 +82,26 @@ export function SoundPage({
         onChange={(adventure) => setTaste({ ...taste, adventure } satisfies TastePrefs)}
       />
 
+      <GroupLabel>discovery rules</GroupLabel>
+      <Text style={styles.rulesHint}>
+        The deck's default strictness. Playlists can relax these for themselves.
+      </Text>
+      {(
+        [
+          ["allowRepeats", "Allow songs to reappear", "saved songs can come back around"],
+          ["includeBuried", "Deal buried songs", "left-swiped songs can return"],
+          ["includeBlockedArtists", "Deal blocked artists", "blocked artists can return"],
+        ] as const
+      ).map(([key, label, sub]) => (
+        <Row
+          key={key}
+          label={label}
+          sub={sub}
+          right={<Toggle on={state.prefs[key]} />}
+          onPress={() => setPrefs({ [key]: !state.prefs[key] })}
+        />
+      ))}
+
       <GroupLabel>what comes back</GroupLabel>
       <ReplayRules onReplay={onReplay} onUnbury={onUnbury} />
 
@@ -113,6 +133,13 @@ export function SoundPage({
 }
 
 const styles = StyleSheet.create({
+  rulesHint: {
+    fontFamily: fonts.body,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.muted,
+    marginBottom: 8,
+  },
   chipWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -134,3 +161,4 @@ const styles = StyleSheet.create({
     color: colors.more,
   },
 });
+

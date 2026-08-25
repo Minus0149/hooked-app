@@ -1,4 +1,4 @@
-/**
+﻿/**
  * A window into a track's audio. A 30-second preview holds three of them; a
  * full upload holds as many as the artist marks.
  */
@@ -23,7 +23,7 @@ export interface Track {
   audioUrl?: string;
   /** ordered best-first by the server; absent means "play the whole preview" */
   hooks?: HookWindow[];
-  /** iTunes storefronts this charted in — the language signal */
+  /** iTunes storefronts this charted in â€” the language signal */
   markets?: string[];
   /** play count normalised 0..1 against the catalogue's leader (hourly job) */
   heat?: number;
@@ -39,6 +39,10 @@ export interface Playlist {
   name: string;
   accent: string;
   tracks: Track[];
+  /** discovery rules — what the deck may deal while this playlist is the target */
+  allowRepeats?: boolean;
+  includeBuried?: boolean;
+  includeBlockedArtists?: boolean;
 }
 
 export type LibraryContainer = "liked" | "discoveries" | `pl:${string}`;
@@ -49,3 +53,4 @@ export const DIR_TO_ACTION: Record<SwipeDir, SwipeAction> = {
   right: "more",
   left: "never",
 };
+
