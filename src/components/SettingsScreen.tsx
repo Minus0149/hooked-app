@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useMutation, useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { useStore } from "../state/store";
-import { AD_FREQUENCIES } from "../data/prefs";
+import { AD_FREQUENCIES, AD_UNITS, AD_UNIT_BOUNDS } from "../data/prefs";
 import { colors, fonts, radii } from "../design/tokens";
 import { Row } from "./settings/kit";
 
@@ -100,22 +100,22 @@ function SupportCard() {
                 key={f.id}
                 style={[
                   styles.supportChip,
-                  state.prefs.adEveryNSwipes === null &&
+                  state.prefs.adCadence === null &&
                     state.prefs.adFrequency === f.id &&
                     styles.chipOn,
                 ]}
-                onPress={() => setPrefs({ adFrequency: f.id, adEveryNSwipes: null })}
+                onPress={() => setPrefs({ adFrequency: f.id, adCadence: null })}
                 accessibilityRole="radio"
                 accessibilityState={{
                   selected:
-                    state.prefs.adEveryNSwipes === null &&
+                    state.prefs.adCadence === null &&
                     state.prefs.adFrequency === f.id,
                 }}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    state.prefs.adEveryNSwipes === null &&
+                    state.prefs.adCadence === null &&
                       state.prefs.adFrequency === f.id &&
                       styles.chipTextOn,
                   ]}
@@ -127,46 +127,86 @@ function SupportCard() {
           </View>
 
           <Text style={styles.freqLabel}>your own pace</Text>
-          <View style={styles.stepper}>
-            <Pressable
-              style={styles.stepBtn}
-              onPress={() =>
-                setPrefs({
-                  adEveryNSwipes: Math.max(
-                    3,
-                    (state.prefs.adEveryNSwipes ?? 12) - 3,
-                  ),
-                })
-              }
-              accessibilityLabel="fewer swipes between cards"
-            >
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>
-              a card every{" "}
-              <Text style={styles.stepValueStrong}>
-                {state.prefs.adEveryNSwipes ?? 12}
-              </Text>{" "}
-              swipes
-            </Text>
-            <Pressable
-              style={styles.stepBtn}
-              onPress={() =>
-                setPrefs({
-                  adEveryNSwipes: Math.min(
-                    200,
-                    (state.prefs.adEveryNSwipes ?? 12) + 3,
-                  ),
-                })
-              }
-              accessibilityLabel="more swipes between cards"
-            >
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
+          <View style={styles.supportRow}>
+            {AD_UNITS.map((u) => (
+              <Pressable
+                key={u.id}
+                style={[
+                  styles.supportChip,
+                  state.prefs.adCadence?.unit === u.id && styles.chipOn,
+                ]}
+                onPress={() => {
+                  const defaults: Record<string, number> = {
+                    swipes: 12, minutes: 30, hours: 2, day: 1,
+                  };
+                  setPrefs({
+                    adCadence: { unit: u.id, value: defaults[u.id] ?? 12 },
+                  });
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: state.prefs.adCadence?.unit === u.id }}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    state.prefs.adCadence?.unit === u.id && styles.chipTextOn,
+                  ]}
+                >
+                  {u.label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
+          {state.prefs.adCadence && (
+            <View style={styles.stepper}>
+              <Pressable
+                style={styles.stepBtn}
+                onPress={() => {
+                  const b = AD_UNIT_BOUNDS[state.prefs.adCadence!.unit];
+                  setPrefs({
+                    adCadence: {
+                      unit: state.prefs.adCadence!.unit,
+                      value: Math.max(b.min, state.prefs.adCadence!.value - b.step),
+                    },
+                  });
+                }}
+                accessibilityLabel="less frequent"
+              >
+                <Text style={styles.stepBtnText}>−</Text>
+              </Pressable>
+              <Text style={styles.stepValue}>
+                {state.prefs.adCadence.unit === "swipes" && (
+                  <>every <Text style={styles.stepValueStrong}>{state.prefs.adCadence.value}</Text> swipes</>
+                )}
+                {state.prefs.adCadence.unit === "minutes" && (
+                  <>every <Text style={styles.stepValueStrong}>{state.prefs.adCadence.value}</Text> min</>
+                )}
+                {state.prefs.adCadence.unit === "hours" && (
+                  <>every <Text style={styles.stepValueStrong}>{state.prefs.adCadence.value}</Text> h</>
+                )}
+                {state.prefs.adCadence.unit === "day" && (
+                  <Text style={styles.stepValueStrong}>{state.prefs.adCadence.value} / day</Text>
+                )}
+              </Text>
+              <Pressable
+                style={styles.stepBtn}
+                onPress={() => {
+                  const b = AD_UNIT_BOUNDS[state.prefs.adCadence!.unit];
+                  setPrefs({
+                    adCadence: {
+                      unit: state.prefs.adCadence!.unit,
+                      value: Math.min(b.max, state.prefs.adCadence!.value + b.step),
+                    },
+                  });
+                }}
+                accessibilityLabel="more frequent"
+              >
+                <Text style={styles.stepBtnText}>+</Text>
+              </Pressable>
+            </View>
+          )}
           <Text style={styles.freqNote}>
-            your dial can only space cards further apart — the ceiling is set by
-            hooked
+            the daily and weekly ceilings set by hooked always hold
           </Text>
         </>
       )}
@@ -368,5 +408,7 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
   chipTextOn: { color: colors.ink },
 });
+
+
 
 

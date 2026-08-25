@@ -102,7 +102,7 @@ export function SoundPage({
         />
       ))}
 
-      <GroupLabel>what comes back</GroupLabel>
+      {/* ReplayRules carries its own "what comes back" heading */}
       <ReplayRules onReplay={onReplay} onUnbury={onUnbury} />
 
       {state.neverArtists.length > 0 && (

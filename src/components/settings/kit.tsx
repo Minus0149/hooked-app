@@ -22,7 +22,7 @@ export function Toggle({ on }: { on: boolean }) {
     borderColor: interpolateColor(v.value, [0, 1], [colors.line, colors.save]),
   }));
   const knobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: v.value * 17 }],
+    transform: [{ translateX: v.value * 19 }],
   }));
 
   return (
@@ -171,6 +171,7 @@ const segStyles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.surface2,
   },
-  label: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
+  label: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.text },
 });
+
 

@@ -551,7 +551,7 @@ function Shell() {
       config: effective,
     });
     if (due) setAdDue(true); // nextAd decides authoritatively
-  }, [state.prefs.adsOptOut, state.prefs.adFrequency, state.prefs.adEveryNSwipes, adsConfig]);
+  }, [state.prefs.adsOptOut, state.prefs.adFrequency, state.prefs.adCadence, adsConfig]);
 
   const adCandidate = useQuery(
     anyApi.ads.nextAd,
@@ -1323,6 +1323,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 });
+
 
 
 
