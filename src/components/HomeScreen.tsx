@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import {
   Image,
   Pressable,
@@ -77,9 +77,42 @@ export function HomeScreen({
   onNewPlaylist: () => void;
 }) {
   const { state } = useStore();
-  const { liked, discoveries, playlists, queue } = state;
+  const { liked, discoveries, playlists, queue, boostGenres, catalog } = state;
 
   const fresh = useMemo(() => queue.slice(0, 10), [queue]);
+
+  // parity with web: the right-swipe steer surfaces as its own row, deduped
+  // by normalized title+artist and never repeating what the queue already
+  // shows below it
+  const becauseRows = useMemo(() => {
+    const norm = (t: Track) =>
+      `${t.title}·${t.artist}`.toLowerCase().replace(/\(.*?\)/g, "").trim();
+    const queueIds = new Set(queue.map((t) => t.id));
+    const genres =
+      boostGenres.length > 0
+        ? boostGenres
+        : [...new Set(liked.map((t) => t.genre))].slice(0, 2);
+    return genres
+      .map((genre) => {
+        const seen = new Set<string>();
+        const tracks = catalog
+          .filter(
+            (t) =>
+              t.genre === genre &&
+              !liked.some((l) => l.id === t.id) &&
+              !queueIds.has(t.id),
+          )
+          .filter((t) => {
+            const key = norm(t);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, 8);
+        return { genre, tracks };
+      })
+      .filter((r) => r.tracks.length > 0);
+  }, [boostGenres, liked, catalog, queue]);
 
   return (
     <ScrollView
@@ -154,6 +187,27 @@ export function HomeScreen({
           </Pressable>
         ))}
       </View>
+
+      {becauseRows.map((row) => (
+        <View key={row.genre} style={styles.becauseWrap}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>
+              Because you wanted more{" "}
+              <Text style={{ color: accent }}>{row.genre}</Text>
+            </Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.rowScroll}
+            contentContainerStyle={styles.rowScrollContent}
+          >
+            {row.tracks.map((t) => (
+              <RowCard key={t.id} track={t} onPick={(id) => onDiscover(id)} />
+            ))}
+          </ScrollView>
+        </View>
+      ))}
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Fresh for you</Text>
@@ -252,6 +306,7 @@ const styles = StyleSheet.create({
   sectionCount: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
   sectionAction: { fontFamily: fonts.bodyBold, fontSize: 12.5 },
   tiles: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
+  becauseWrap: { marginBottom: 4 },
   tile: {
     flexBasis: "47%",
     flexGrow: 1,
@@ -307,3 +362,4 @@ const styles = StyleSheet.create({
   listTitle: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.text },
   listArtist: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted },
 });
+

@@ -192,6 +192,8 @@ function AuthForm({ accent }: { accent: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const submit = async () => {
     if (!email.trim() || !password) return;
@@ -208,6 +210,26 @@ function AuthForm({ accent }: { accent: string }) {
     setBusy(false);
     if (result.error) {
       setError(result.error.message ?? "Something went wrong");
+    }
+  };
+
+  // parity with web: the reset link lands in email and opens the web app,
+  // where the new password is set — then signing in here just works
+  const sendReset = async () => {
+    if (!email.trim() || resetting) return;
+    setResetting(true);
+    setError(null);
+    try {
+      const res = await authClient.requestPasswordReset({
+        email: email.trim(),
+        redirectTo: "https://app.hookedcue.com/#/",
+      });
+      if (res.error) throw new Error(res.error.message ?? "Couldn't send it");
+      setResetSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send a reset link");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -271,9 +293,7 @@ function AuthForm({ accent }: { accent: string }) {
           </View>
           <TextInput
             style={styles.input}
-            placeholder={
-              mode === "signup" ? "create a password (8+ characters)" : "your password"
-            }
+            placeholder={mode === "signup" ? "create a password" : "your password"}
             placeholderTextColor={colors.muted}
             value={password}
             onChangeText={setPassword}
@@ -286,8 +306,17 @@ function AuthForm({ accent }: { accent: string }) {
           <Text style={styles.clusterHint}>
             {mode === "signup"
               ? "hashed on our side — even we can't read it"
-              : "eight characters minimum"}
+              : resetSent
+                ? "reset link sent — check that inbox (and promotions)"
+                : "eight characters minimum"}
           </Text>
+          {mode === "signin" && !resetSent && (
+            <Pressable onPress={() => void sendReset()}>
+              <Text style={[styles.clusterHint, { color: accent, textDecorationLine: "underline" }]}>
+                {resetting ? "sending…" : "forgot it? send a reset link"}
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {error && <Text style={styles.authError}>{error}</Text>}
@@ -461,6 +490,8 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   cluster: {
+    width: "100%",
+    alignSelf: "stretch",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
@@ -509,6 +540,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   input: {
+    width: "100%",
     paddingHorizontal: 16,
     paddingVertical: 13,
     borderRadius: 16,
@@ -525,6 +557,7 @@ const styles = StyleSheet.create({
     color: colors.never,
   },
   primaryBtn: {
+    width: "100%",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,

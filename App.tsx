@@ -44,6 +44,7 @@ import { hooksOf, sourceOf, windowTiming } from "./src/lib/hooks";
 import { HomeScreen } from "./src/components/HomeScreen";
 import { LibraryScreen } from "./src/components/LibraryScreen";
 import { SettingsScreen } from "./src/components/SettingsScreen";
+import { StatsScreen } from "./src/components/StatsScreen";
 import { AppearancePage } from "./src/components/settings/AppearancePage";
 import { PlaybackPage } from "./src/components/settings/PlaybackPage";
 import { GesturesPage } from "./src/components/settings/GesturesPage";
@@ -84,6 +85,7 @@ type Screen =
   | "discover"
   | "profile"
   | "settings"
+  | "stats"
   | `library:${string}`
   | `settings:${SettingsPageId}`;
 
@@ -249,6 +251,12 @@ function Shell() {
   const recordAdEvent = useMutation(anyApi.ads.recordEvent);
 
   // live runtime config — the free-swipe wall is admin-tunable, pushed live
+  // creator status decides whether Settings shows the analytics + studio rows
+  const creatorDash = useQuery(
+    anyApi.creators.dashboard,
+    signedIn ? {} : "skip",
+  ) as { creator: unknown; curator: boolean } | null | undefined;
+
   const runtimeCfg = useQuery(anyApi.runtime.get) as
     | { gateFreeSwipes: number }
     | null
@@ -1140,10 +1148,14 @@ function Shell() {
         />
       )}
 
+      {screen === "stats" && <StatsScreen onBack={pop} />}
+
       {screen === "settings" && (
         <SettingsScreen
           onBack={pop}
+          onOpenStats={() => push("stats")}
           signedIn={signedIn}
+          canViewStats={signedIn && (library?.isAdmin === true || creatorDash?.creator != null || creatorDash?.curator === true)}
           onOpen={(page) => push(`settings:${page}`)}
         />
       )}
@@ -1323,6 +1335,8 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 });
+
+
 
 
 

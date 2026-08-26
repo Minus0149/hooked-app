@@ -222,11 +222,16 @@ function SupportCard() {
 export function SettingsScreen({
   onBack,
   onOpen,
+  onOpenStats,
   signedIn,
+  canViewStats = false,
 }: {
   onBack: () => void;
   onOpen: (page: "appearance" | "playback" | "gestures" | "sound" | "data") => void;
+  onOpenStats: () => void;
   signedIn: boolean;
+  /** admin or approved creator — reveals the Analytics row */
+  canViewStats?: boolean;
 }) {
   const { state } = useStore();
 
@@ -290,6 +295,17 @@ export function SettingsScreen({
           chevron
           onPress={() => onOpen("sound")}
         />
+        {canViewStats && (
+          <Row
+            icon="bar-chart-2"
+            iconColor={colors.more}
+            label="Analytics"
+            sub="live deck numbers · your tracks"
+            chevron
+            onPress={onOpenStats}
+          />
+        )}
+
         <Row
           icon="shield"
           label="Data & privacy"
@@ -408,6 +424,7 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
   chipTextOn: { color: colors.ink },
 });
+
 
 
 
