@@ -18,3 +18,17 @@ jobs:
         run: node scripts/check-mojibake.mjs App.tsx src
       - name: typecheck
         run: npx tsc --noEmit
+      # The backend is a different repository, so these calls go through
+      # anyApi and nothing checks the paths. With the server checked out
+      # beside us they can be. Private-repo checkouts need a token this
+      # workflow may not have; without one the guard reports that it skipped
+      # rather than failing the build. It always runs locally, where the two
+      # repos sit side by side.
+      - name: fetch the server's function list
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: Minus0149/hooked-website
+          path: .server
+      - name: api paths resolve
+        run: node scripts/check-api-paths.mjs .server/convex
