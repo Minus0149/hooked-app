@@ -31,7 +31,7 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from "expo-audio";
-import { ConvexReactClient, useMutation, useQuery } from "convex/react";
+import { ConvexReactClient, useConvex, useMutation, useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { coerceTaste } from "./src/data/taste";
@@ -176,6 +176,7 @@ function Shell() {
     hydrateRemote,
     resetLocal,
     applyCatalog,
+    applyAffinity,
     setReplay,
     unbury,
     unblockArtist,
@@ -261,6 +262,42 @@ function Shell() {
     | { gateFreeSwipes: number }
     | null
     | undefined;
+
+  /**
+   * Ask the recommender what it makes of this listener.
+   *
+   * Fetched once per sign-in rather than subscribed to. `recommend.forMe`
+   * reads the asking listener's own swipe log, so a live subscription would
+   * recompute on every swipe — dozens of indexed reads per card, to move a
+   * ranking that only takes effect when the deck next refills.
+   *
+   * Failing is silent by design: no affinity leaves the deck ranked the way it
+   * was before any of this existed.
+   */
+  const convex = useConvex();
+  const affinityFor = useRef<string | null>(null);
+  useEffect(() => {
+    const uid = session.data?.user?.id ?? null;
+    if (!uid) {
+      affinityFor.current = null;
+      return;
+    }
+    if (affinityFor.current === uid) return;
+    affinityFor.current = uid;
+    let live = true;
+    void convex
+      .query(anyApi.recommend.forMe, {})
+      .then((result: { strength: number; scores: { trackId: string; score: number }[] } | null) => {
+        if (!live || !result) return;
+        const scores: Record<string, number> = {};
+        for (const row of result.scores) scores[row.trackId] = row.score;
+        applyAffinity(scores, result.strength);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [convex, session.data?.user?.id, applyAffinity]);
 
   useEffect(() => {
     // An empty catalogue is a REAL state (admin hid everything) — honour it

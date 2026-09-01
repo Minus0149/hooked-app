@@ -17,6 +17,38 @@ import {
   type TastePrefs,
 } from "../data/taste";
 import { coercePrefs, DEFAULT_PREFS, type UserPrefs } from "../data/prefs";
+import {
+  buildQueue,
+  rankPool,
+  shuffle,
+  spreadAlbums,
+  uniqueById,
+  type Steer,
+} from "../data/ranking";
+
+/**
+ * The signals this listener's deck answers to, gathered from state.
+ *
+ * `affinity` is the shared model's opinion (convex/recommend.ts) and arrives
+ * after sign-in — empty until then, which leaves the deck ranked exactly as it
+ * was before the recommender existed.
+ */
+function sameScores(a: Record<string, number>, b: Record<string, number>): boolean {
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((k) => a[k] === b[k]);
+}
+
+function steerOf(
+  state: Pick<AppState, "taste" | "boostGenres" | "affinity" | "affinityStrength">,
+): Steer {
+  return {
+    taste: state.taste,
+    boostGenres: state.boostGenres,
+    affinity: state.affinity,
+    affinityStrength: state.affinityStrength,
+  };
+}
 
 /**
  * Songs shipped inside the app binary. They are the offline deck and what a
@@ -66,6 +98,18 @@ export interface AppState {
    * untouched); anything seen in the last 7 days waits its turn.
    */
   deckMemory: Record<string, { seen: number; skips: number }>;
+  /**
+   * What the catalogue's other listeners imply about this one: a score per
+   * track from the shared neighbour model (convex/recommend.ts). Sparse by
+   * design, and empty until the server has something to say.
+   */
+  affinity: Record<string, number>;
+  /**
+   * How far affinity may move a track, in places. Comes from the runtime
+   * config, so an admin can turn the recommender down — or off — without a
+   * store build. Zero here and the deck is exactly what it was before.
+   */
+  affinityStrength: number;
 }
 
 type Persisted = Partial<
@@ -123,72 +167,20 @@ type Action =
   | {
       // the server catalogue arrived: it replaces the baked one wholesale,
       // which is what brings hooks and creator tracks into the deck
+      // the server scored this listener against the shared neighbour model
+      type: "APPLY_AFFINITY";
+      scores: Record<string, number>;
+      strength: number;
+    }
+  | {
       type: "APPLY_CATALOG";
       tracks: Track[];
     }
   | { type: "RESET" };
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
-/**
- * Shuffle, then let taste pull matches forward.
- *
- * Not a sort by score: that would front-load every match in the catalogue and
- * the deck would feel like a playlist someone else made. Shuffling first and
- * biasing second keeps it unpredictable while still opening with things they
- * said they wanted. A right-swipe's genre steer works the same way at half
- * weight — one gesture is a nudge, not a stated preference.
- */
-function tasteSort(
-  tracks: Track[],
-  taste: TastePrefs,
-  boostGenres?: string[],
-): Track[] {
-  const scored = shuffle(tracks).map((t, i) => ({
-    t,
-    key:
-      i -
-      tasteScore(t, taste) * 12 -
-      genreBoostScore(t, boostGenres ?? []) * 6,
-  }));
-  scored.sort((a, b) => a.key - b.key);
-  return scored.map((s) => s.t);
-}
 
-/** Same idea for listeners who never answered the onboarding questions. */
-function boostSort(tracks: Track[], boostGenres: string[]): Track[] {
-  const scored = shuffle(tracks).map((t, i) => ({
-    t,
-    key: i - genreBoostScore(t, boostGenres) * 6,
-  }));
-  scored.sort((a, b) => a.key - b.key);
-  return scored.map((s) => s.t);
-}
 
-function buildQueue(
-  catalog: Track[],
-  exclude: Set<string>,
-  neverArtists: string[],
-  taste?: TastePrefs,
-  boostGenres?: string[],
-): Track[] {
-  const fresh = catalog.filter(
-    (t) => !exclude.has(t.id) && !neverArtists.includes(t.artist),
-  );
-  // If the user has heard everything, loop the catalog rather than dead-ending
-  const pool =
-    fresh.length > 4 ? fresh : catalog.filter((t) => !neverArtists.includes(t.artist));
-  if (taste && (taste.languages.length || taste.genres.length))
-    return tasteSort(pool, taste, boostGenres);
-  return boostGenres?.length ? boostSort(pool, boostGenres) : shuffle(pool);
-}
 
 /**
  * Everything the deck must not deal again.
@@ -229,44 +221,28 @@ function libraryIds(state: Pick<AppState, "liked" | "discoveries" | "playlists">
   );
 }
 
-/**
- * Queue invariant: every track id appears at most once. Duplicate ids break
- * React's keyed card stack ("two children with the same key") which renders
- * as duplicated/stale card images — this guard makes that impossible.
- */
-function uniqueById(tracks: Track[]): Track[] {
-  const seen = new Set<string>();
-  return tracks.filter((t) => {
-    if (seen.has(t.id)) return false;
-    seen.add(t.id);
-    return true;
-  });
-}
 
-/**
- * Many catalog tracks share one album's artwork. Two of those back-to-back
- * look like "the card didn't change" even when everything works — push
- * same-artwork neighbors apart. Never moves index 0 (the visible card).
- */
-function spreadAlbums(tracks: Track[]): Track[] {
-  const out = [...tracks];
-  for (let i = 1; i < out.length; i++) {
-    if (out[i].artwork === out[i - 1].artwork) {
-      const j = out.findIndex((t, k) => k > i && t.artwork !== out[i - 1].artwork);
-      if (j > i) [out[i], out[j]] = [out[j], out[i]];
-    }
-  }
-  return out;
-}
+
+const NO_AFFINITY: Pick<AppState, "affinity" | "affinityStrength"> = {
+  // never persisted: it is the server's opinion, it goes stale the moment the
+  // model rebuilds, and a signed-out listener has none
+  affinity: {},
+  affinityStrength: 0,
+};
 
 const initialState: AppState = {
+  ...NO_AFFINITY,
   catalog: BAKED,
   allowedIds: null,
   neverTracks: [],
   replayContainers: [],
   taste: EMPTY_TASTE,
   prefs: DEFAULT_PREFS,
-  queue: buildQueue(BAKED, new Set(), []),
+  queue: buildQueue(BAKED, new Set(), [], {
+    taste: EMPTY_TASTE,
+    boostGenres: [],
+    ...NO_AFFINITY,
+  }),
   history: [],
   liked: [],
   discoveries: [],
@@ -308,13 +284,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...merged,
         queue: spreadAlbums(
-          buildQueue(
-            state.catalog,
-            inLibrary,
-            merged.neverArtists,
-            merged.taste,
-            merged.boostGenres,
-          ),
+          buildQueue(state.catalog, inLibrary, merged.neverArtists, steerOf(merged)),
         ),
       };
     }
@@ -370,6 +340,19 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    case "APPLY_AFFINITY": {
+      // Deliberately does NOT rebuild the queue. The model's opinion is worth
+      // a few places, not worth the cards under someone's thumb rearranging
+      // themselves mid-session. It is stored, and the next refill picks it up.
+      if (
+        state.affinityStrength === action.strength &&
+        sameScores(state.affinity, action.scores)
+      ) {
+        return state;
+      }
+      return { ...state, affinity: action.scores, affinityStrength: action.strength };
+    }
+
     case "APPLY_CATALOG": {
       const ids = action.tracks.map((t) => t.id);
       // tracks.list is reactive; returning a fresh object on every re-fire
@@ -393,8 +376,7 @@ function reducer(state: AppState, action: Action): AppState {
         action.tracks,
         exclude,
         state.prefs.includeBlockedArtists ? [] : state.neverArtists,
-        state.taste,
-        state.boostGenres,
+        steerOf(state),
       );
       return {
         ...state,
@@ -410,7 +392,11 @@ function reducer(state: AppState, action: Action): AppState {
         // a reset clears the user's data, not the catalogue we already fetched
         catalog: state.catalog,
         allowedIds: state.allowedIds,
-        queue: buildQueue(state.catalog, new Set(), []),
+        queue: buildQueue(state.catalog, new Set(), [], {
+          taste: EMPTY_TASTE,
+          boostGenres: [],
+          ...NO_AFFINITY,
+        }),
         hydrated: true,
       };
 
@@ -532,14 +518,7 @@ function reducer(state: AppState, action: Action): AppState {
         }
         const fresh = pickable.filter((t) => !avoid.has(t.id));
         const pool = fresh.length >= 3 ? fresh : pickable.filter((t) => t.id !== current.id);
-        rest = [
-          ...rest,
-          ...(state.taste.languages.length || state.taste.genres.length
-            ? tasteSort(pool, state.taste, boostGenres)
-            : boostGenres.length
-              ? boostSort(pool, boostGenres)
-              : shuffle(pool)),
-        ];
+        rest = [...rest, ...rankPool(pool, { ...steerOf(state), boostGenres })];
       }
       // deck memory: every dealt card is remembered — skips count toward the
       // two-strike auto-bury (song only; the artist stays dealable)
@@ -647,8 +626,7 @@ function reducer(state: AppState, action: Action): AppState {
             state.catalog,
             blockedIds(state),
             state.prefs.includeBlockedArtists ? [] : state.neverArtists,
-            action.taste,
-            state.boostGenres,
+            { ...steerOf(state), taste: action.taste },
           ),
         ),
       };
@@ -747,6 +725,7 @@ interface StoreValue {
   }) => void;
   resetLocal: () => void;
   applyCatalog: (tracks: Track[]) => void;
+  applyAffinity: (scores: Record<string, number>, strength: number) => void;
   catalog: Track[];
 }
 
@@ -833,6 +812,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       back: () => dispatch({ type: "BACK" }),
       jumpTo: (trackId: string) => dispatch({ type: "JUMP_TO", trackId }),
       applyCatalog: (tracks: Track[]) => dispatch({ type: "APPLY_CATALOG", tracks }),
+      applyAffinity: (scores: Record<string, number>, strength: number) =>
+        dispatch({ type: "APPLY_AFFINITY", scores, strength }),
       setReplay: (container: string, allow: boolean) =>
         dispatch({ type: "SET_REPLAY", container, allow }),
       unbury: (trackId: string) => dispatch({ type: "UNBURY", trackId }),
