@@ -1,4 +1,4 @@
-﻿import { useMemo } from "react";
+﻿import { useEffect, useMemo, useRef } from "react";
 import {
   Image,
   Pressable,
@@ -130,6 +130,23 @@ export function HomeScreen({
       .filter((r) => r.tracks.length > 0);
   }, [boostGenres, liked, catalog, queue]);
 
+
+  // The row holds all six faces and runs off the side of the screen, so the
+  // mood you're in could be the one you can't see. The active chip is brought
+  // to the middle whenever the mood changes or the row first lays out.
+  const moodRowRef = useRef<ScrollView>(null);
+  const moodRowWidth = useRef(0);
+  const chipAt = useRef<Record<string, { x: number; width: number }>>({});
+  const centreActiveMood = (animated: boolean) => {
+    const at = state.mood ? chipAt.current[state.mood] : undefined;
+    if (!at || moodRowWidth.current === 0) return;
+    const x = Math.max(0, at.x - (moodRowWidth.current - at.width) / 2);
+    moodRowRef.current?.scrollTo({ x, animated });
+  };
+  useEffect(() => {
+    centreActiveMood(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.mood]);
   return (
     <ScrollView
       style={styles.scroll}
@@ -158,17 +175,17 @@ export function HomeScreen({
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>What&apos;s the mood?</Text>
-        {state.prefs.moodByTime !== "off" ? (
-          <Text style={styles.sectionCount} numberOfLines={1}>
-            {DAYPART_COPY[hour.part].nudge}
-          </Text>
-        ) : null}
       </View>
       <ScrollView
+        ref={moodRowRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.moodScroll}
         contentContainerStyle={styles.moodRow}
+        onLayout={(e) => {
+          moodRowWidth.current = e.nativeEvent.layout.width;
+          centreActiveMood(false);
+        }}
       >
         {hour.moods.map((mood) => {
           const isOn = state.mood === mood.id;
@@ -177,11 +194,14 @@ export function HomeScreen({
           return (
             <Pressable
               key={mood.id}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                chipAt.current[mood.id] = { x, width };
+                if (isOn) centreActiveMood(false);
+              }}
               style={({ pressed }) => [
                 styles.moodChip,
-                isSuggested && { borderColor: mixHex(mood.accent, colors.line, 0.55) },
-                isOn && { backgroundColor: mood.accent, borderColor: mood.accent },
-                pressed && { transform: [{ scale: 0.95 }] },
+                pressed && { transform: [{ scale: 0.94 }] },
               ]}
               onPress={() => {
                 setMood(mood.id);
@@ -191,15 +211,23 @@ export function HomeScreen({
               accessibilityState={{ selected: isOn }}
               accessibilityLabel={`${mood.label} — ${mood.line}`}
             >
-              <Face
-                mood={mood.id}
-                size={26}
-                color={isOn ? colors.ink : isSuggested ? mood.accent : colors.muted}
-              />
+              <View
+                style={[
+                  styles.moodDisc,
+                  isSuggested && { borderColor: mixHex(mood.accent, colors.line, 0.58) },
+                  isOn && { backgroundColor: mood.accent, borderColor: mood.accent },
+                ]}
+              >
+                <Face
+                  mood={mood.id}
+                  size={30}
+                  color={isOn ? colors.ink : isSuggested ? mood.accent : colors.muted}
+                />
+              </View>
               <Text
                 style={[
                   styles.moodChipLabel,
-                  { color: isOn ? colors.ink : isSuggested ? mood.accent : colors.muted },
+                  { color: isOn ? colors.text : isSuggested ? mood.accent : colors.muted },
                 ]}
                 numberOfLines={1}
               >
@@ -209,11 +237,7 @@ export function HomeScreen({
           );
         })}
         <Pressable
-          style={({ pressed }) => [
-            styles.moodChip,
-            state.mood === null && { borderColor: colors.muted },
-            pressed && { transform: [{ scale: 0.95 }] },
-          ]}
+          style={({ pressed }) => [styles.moodChip, pressed && { transform: [{ scale: 0.94 }] }]}
           onPress={() => {
             setMood(null);
             onDiscover();
@@ -221,10 +245,15 @@ export function HomeScreen({
           accessibilityRole="button"
           accessibilityLabel="Anything — no mood on the deck"
         >
-          <Text style={styles.moodAny}>∞</Text>
+          <View style={[styles.moodDisc, state.mood === null && { borderColor: colors.muted }]}>
+            <Text style={styles.moodAny}>∞</Text>
+          </View>
           <Text style={[styles.moodChipLabel, { color: colors.muted }]}>Anything</Text>
         </Pressable>
       </ScrollView>
+      {state.prefs.moodByTime !== "off" ? (
+        <Text style={styles.moodNudge}>{DAYPART_COPY[hour.part].nudge}</Text>
+      ) : null}
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Your library</Text>
@@ -391,23 +420,30 @@ const styles = StyleSheet.create({
   },
   sectionCount: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
   sectionAction: { fontFamily: fonts.bodyBold, fontSize: 12.5 },
-  moodScroll: { marginHorizontal: -20, marginBottom: 28 },
-  moodRow: { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingBottom: 2 },
-  moodChip: {
-    width: 78,
-    minHeight: 78,
+  moodScroll: { marginHorizontal: -20 },
+  moodRow: { flexDirection: "row", gap: 6, paddingHorizontal: 20, paddingBottom: 2 },
+  // circles, matching the ring: the face on the card, on the ring and here are
+  // the same round object at three sizes
+  moodChip: { width: 82, alignItems: "center", gap: 8, paddingTop: 2, paddingBottom: 4 },
+  moodDisc: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
   },
   moodChipLabel: { fontFamily: fonts.bodyBold, fontSize: 11.5 },
-  moodAny: { fontFamily: fonts.body, fontSize: 24, lineHeight: 26, color: colors.muted },
+  moodAny: { fontFamily: fonts.body, fontSize: 24, lineHeight: 28, color: colors.muted },
+  moodNudge: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12.5,
+    color: colors.muted,
+    marginTop: 10,
+    marginBottom: 28,
+  },
   tiles: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   becauseWrap: { marginBottom: 4 },
   tile: {

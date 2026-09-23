@@ -3,7 +3,8 @@
  *
  * `taste.ts`, `ranking.ts`, `mood.ts` and `predict.ts` are the product's
  * judgement — what a mood means, how much a save is worth, how a pool is
- * ordered. They exist twice because the two apps have separate bundles, and
+ * ordered. `lib/authGate.ts` decides when a new account's profile may be
+ * created; drift there is a sign-up that silently never syncs on one client. They exist twice because the two apps have separate bundles, and
  * nothing in either toolchain notices when one copy is edited and the other is
  * not. The failure is silent and slow: the phone and the browser rank the same
  * catalogue differently, which is two products wearing one name.
@@ -22,7 +23,14 @@ import { readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const WEB = resolve(process.argv[2] ?? "../web");
-const MODULES = ["taste.ts", "ranking.ts", "mood.ts", "predict.ts"];
+// paths under src/
+const MODULES = [
+  "data/taste.ts",
+  "data/ranking.ts",
+  "data/mood.ts",
+  "data/predict.ts",
+  "lib/authGate.ts",
+];
 
 try {
   statSync(join(WEB, "src/data"));
@@ -46,15 +54,15 @@ for (const name of MODULES) {
   let here;
   let there;
   try {
-    here = readFileSync(join("src/data", name), "utf8");
+    here = readFileSync(join("src", name), "utf8");
   } catch {
-    problems.push(`src/data/${name} is missing from this app`);
+    problems.push(`src/${name} is missing from this app`);
     continue;
   }
   try {
-    there = readFileSync(join(WEB, "src/data", name), "utf8");
+    there = readFileSync(join(WEB, "src", name), "utf8");
   } catch {
-    problems.push(`web/src/data/${name} is missing — was it renamed on one side?`);
+    problems.push(`web/src/${name} is missing — was it renamed on one side?`);
     continue;
   }
   checked++;
@@ -69,7 +77,7 @@ for (const name of MODULES) {
   for (let i = 0; i < upto; i++) {
     if (a[i] === b[i]) continue;
     problems.push(
-      `src/data/${name} and web/src/data/${name} diverge at line ${i + 1}\n` +
+      `src/${name} and web/src/${name} diverge at line ${i + 1}\n` +
         `      mobile: ${(a[i] ?? "<end of file>").trim().slice(0, 90)}\n` +
         `      web:    ${(b[i] ?? "<end of file>").trim().slice(0, 90)}`,
     );

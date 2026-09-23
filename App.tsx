@@ -31,7 +31,8 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from "expo-audio";
-import { ConvexReactClient, useConvex, useMutation, useQuery } from "convex/react";
+import { ConvexReactClient, useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
+import { profileCheck } from "./src/lib/authGate";
 import { anyApi } from "convex/server";
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { coerceTaste } from "./src/data/taste";
@@ -238,6 +239,8 @@ function Shell() {
   // ----- cloud sync (ported from web/src/App.tsx) -----
   const session = authClient.useSession();
   const signedIn = !!session.data;
+  const { isAuthenticated: backendAuthed } = useConvexAuth();
+  const profileStage = profileCheck(signedIn, backendAuthed);
   const library = useQuery(anyApi.library.getLibrary) as
     | ServerLibrary
     | null
@@ -328,9 +331,11 @@ function Shell() {
    */
   const crowdFetched = useRef<string | null>(null);
   useEffect(() => {
-    const uid = session.data?.user?.id ?? "guest";
-    if (crowdFetched.current === uid) return;
-    crowdFetched.current = uid;
+    // keyed on the backend's view too: the listener's own votes can only be
+    // read once Convex holds their token, which lands after the session does
+    const key = `${session.data?.user?.id ?? "guest"}:${profileStage}`;
+    if (crowdFetched.current === key) return;
+    crowdFetched.current = key;
     let live = true;
     void convex
       .query(anyApi.moods.crowd, {})
@@ -348,7 +353,7 @@ function Shell() {
         applyCrowdMoods(crowd);
       })
       .catch(() => undefined);
-    if (session.data?.user?.id) {
+    if (session.data?.user?.id && profileStage === "ready") {
       void convex
         .query(anyApi.moods.mine, {})
         .then((rows: { trackId: string; mood: string }[] | null) => {
@@ -365,7 +370,7 @@ function Shell() {
     return () => {
       live = false;
     };
-  }, [convex, session.data?.user?.id, applyCrowdMoods, applyMoodPicks]);
+  }, [convex, session.data?.user?.id, profileStage, applyCrowdMoods, applyMoodPicks]);
 
   const voteMood = useMutation(anyApi.moods.vote);
   /**
@@ -482,10 +487,11 @@ function Shell() {
     "ok" | "pending" | "rejected" | "none" | null
   >(null);
   useEffect(() => {
-    if (!signedIn) {
+    if (profileStage === "signed-out") {
       setAccessState(null);
       return;
     }
+    if (profileStage === "waiting") return; // the backend hasn't got the token yet
     void ensureProfile({})
       .then(() => setAccessState("ok"))
       .catch((err: unknown) => {
@@ -495,7 +501,7 @@ function Shell() {
         else if (message.includes("ACCESS_NOT_REQUESTED")) setAccessState("none");
         else setAccessState(null); // a network blip is not a rejection
       });
-  }, [signedIn, ensureProfile]);
+  }, [profileStage, ensureProfile]);
 
   useEffect(() => {
     if (signedIn) {
@@ -1163,11 +1169,13 @@ function Shell() {
       <Onboarding
         demoTracks={demoTracks}
         demoCatalog={state.catalog}
-        onFinish={(taste) => {
+        onFinish={(taste, firstMood) => {
           void AsyncStorage.setItem(ONBOARD_KEY, "1");
           // apply locally first so the very first deck is already tilted; the
           // server copy is for the next device they sign in on
           setTaste(taste);
+          // the mood picked in the tour opens the deck — the point of asking then
+          if (firstMood) setMood(firstMood);
           if (signedIn) syncWrite("setTaste", { ...taste }, setTasteMutation);
           setOnboarded(true);
           setStack(["discover"]);

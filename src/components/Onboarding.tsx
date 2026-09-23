@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Dimensions,
   Pressable,
@@ -33,6 +33,8 @@ import {
   type TastePrefs,
 } from "../data/taste";
 import { resolveDirWorklet } from "./SwipeDeck";
+import { MoodWheel, type HostRect } from "./MoodWheel";
+import { moodAtPush, moodById, type MoodId } from "../data/mood";
 import { colors, fonts, radii } from "../design/tokens";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
@@ -220,6 +222,68 @@ function DemoCard({
   );
 }
 
+/**
+ * The fifth gesture, which nothing else teaches.
+ *
+ * A swipe announces itself — the card moves the instant you touch it. A hold
+ * shows nothing until it fires, so you either know it is there or you never
+ * find it. This card is held rather than swiped: the ring opens around the
+ * thumb, and the push that picks a face is the same push the deck uses, so the
+ * tour teaches the real gesture rather than a simplified one.
+ */
+function HoldDemo({
+  track,
+  onOpen,
+  onAim,
+  onRelease,
+}: {
+  track: Track;
+  onOpen: (x: number, y: number) => void;
+  onAim: (dx: number, dy: number) => void;
+  onRelease: () => void;
+}) {
+  const press = useSharedValue(1);
+  const hold = Gesture.Pan()
+    .activateAfterLongPress(420)
+    .onBegin(() => {
+      press.value = withTiming(0.97, { duration: 420 });
+    })
+    .onStart((e) => {
+      runOnJS(onOpen)(e.absoluteX, e.absoluteY);
+    })
+    .onUpdate((e) => {
+      runOnJS(onAim)(e.translationX, e.translationY);
+    })
+    .onEnd(() => {
+      runOnJS(onRelease)();
+    })
+    .onFinalize(() => {
+      press.value = withSpring(1, { stiffness: 380, damping: 28 });
+    });
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+
+  return (
+    <GestureDetector gesture={hold}>
+      <Animated.View entering={FadeIn.duration(220)} style={[styles.demoCard, style]}>
+        <Image source={{ uri: track.artwork }} style={styles.demoArt} />
+        <LinearGradient
+          colors={[colors.scrimFade, colors.scrimBottom]}
+          style={styles.demoScrim}
+          pointerEvents="none"
+        />
+        <View style={styles.demoMeta} pointerEvents="none">
+          <Text style={styles.demoTitle} numberOfLines={1}>
+            {track.title}
+          </Text>
+          <Text style={styles.demoArtist} numberOfLines={1}>
+            {track.artist}
+          </Text>
+        </View>
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
 /** Progress dot — the active ones stretch wide and go accent. */
 function Dot({ on }: { on: boolean }) {
   const style = useAnimatedStyle(
@@ -239,7 +303,15 @@ function Dot({ on }: { on: boolean }) {
  * actually perform each swipe on a demo card, step 5 wraps up.
  */
 const TASTE_STEPS = 3;
-const LAST_STEP = TASTE_STEPS + GESTURE_STEPS.length + 1;
+/** welcome + taste + the four swipes + the hold */
+const HOLD_STEP = TASTE_STEPS + GESTURE_STEPS.length + 1;
+/**
+ * ...and done. Named, not written as a number: this file used to say `5`
+ * here, which was right before the taste questions were added and wrong after
+ * — step 5 then drew the swipe-down demo AND "you're ready" at once, with a
+ * "Start discovering" button that skipped three of the four gestures.
+ */
+const LAST_STEP = HOLD_STEP + 1;
 
 export function Onboarding({
   demoTracks,
@@ -249,15 +321,47 @@ export function Onboarding({
   demoTracks: Track[];
   /** the live deck, so the questions only offer what it can serve */
   demoCatalog: Track[];
-  onFinish: (taste: TastePrefs) => void;
+  onFinish: (taste: TastePrefs, mood: MoodId | null) => void;
 }) {
-  // 0 = welcome, 1-3 = taste, 4-7 = gestures, 8 = done
+  // 0 = welcome, 1-3 = taste, 4-7 = the four swipes, 8 = the hold, 9 = done
   const [step, setStep] = useState(0);
   const [taste, setTaste] = useState<TastePrefs>(EMPTY_TASTE);
+  const [mood, setMood] = useState<MoodId | null>(null);
+
+  // the ring, exactly as the deck runs it
+  const rootRef = useRef<View>(null);
+  const [host, setHost] = useState<HostRect>({ x: 0, y: 0, width: SCREEN_W, height: SCREEN_H });
+  const [ring, setRing] = useState<{ x: number; y: number } | null>(null);
+  const [aim, setAim] = useState<MoodId | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const closeRing = useCallback(() => {
+    setRing(null);
+    setAim(null);
+    setDragging(false);
+  }, []);
+  const openRing = useCallback((x: number, y: number) => {
+    rootRef.current?.measureInWindow((hx, hy, width, height) =>
+      setHost({ x: hx, y: hy, width, height }),
+    );
+    setRing({ x, y });
+    setAim(null);
+    setDragging(true);
+  }, []);
+  const aimRing = useCallback((dx: number, dy: number) => setAim(moodAtPush(dx, dy, 38)), []);
+  const releaseRing = useCallback(() => setDragging(false), []);
+  const wasDragging = useRef(false);
+  useEffect(() => {
+    if (wasDragging.current && !dragging && aim) {
+      setMood(aim);
+      closeRing();
+    }
+    wasDragging.current = dragging;
+  }, [dragging, aim, closeRing]);
   const gi = step - TASTE_STEPS;
-  const gs = gi >= 1 && gi <= GESTURE_STEPS.length ? GESTURE_STEPS[gi - 1] : null;
+  const gs =
+    step < HOLD_STEP && gi >= 1 && gi <= GESTURE_STEPS.length ? GESTURE_STEPS[gi - 1] : null;
   const options = useMemo(() => availableTasteOptions(demoCatalog), [demoCatalog]);
-  const finish = () => onFinish(taste);
+  const finish = () => onFinish(taste, mood);
   const toggle = (key: "languages" | "genres", id: string) =>
     setTaste((t) => ({
       ...t,
@@ -267,7 +371,7 @@ export function Onboarding({
     gs && demoTracks.length ? demoTracks[(gi - 1) % demoTracks.length] : null;
 
   return (
-    <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
+    <SafeAreaView ref={rootRef} style={styles.root} edges={["top", "bottom"]}>
       <Text style={styles.wordmark}>
         hooked<Text style={{ color: colors.accentDefault }}>.</Text>
       </Text>
@@ -382,7 +486,35 @@ export function Onboarding({
           </Animated.View>
         )}
 
-        {step === 5 && (
+        {step === HOLD_STEP && (
+          <Animated.View
+            key="hold"
+            entering={FadeInDown.duration(280)}
+            exiting={FadeOutUp.duration(180)}
+            style={styles.stepWrap}
+          >
+            <Text style={[styles.headline, styles.headlineSm]}>
+              and <Text style={{ color: colors.accentDefault }}>hold</Text>, then push
+            </Text>
+            <View style={styles.demo}>
+              {demoTracks.length > 0 ? (
+                <HoldDemo
+                  track={demoTracks[0]}
+                  onOpen={openRing}
+                  onAim={aimRing}
+                  onRelease={releaseRing}
+                />
+              ) : null}
+            </View>
+            <Text style={styles.copy}>
+              {mood
+                ? `Nice — we'll open with ${moodById(mood)?.label.toLowerCase()}. Hold any card to change it, any time.`
+                : "Hold the card, push toward a face, let go. It steers the deck that way and tells us what the song feels like."}
+            </Text>
+          </Animated.View>
+        )}
+
+        {step === LAST_STEP && (
           <Animated.View
             key="done"
             entering={FadeInDown.duration(280)}
@@ -392,15 +524,15 @@ export function Onboarding({
               you're <Text style={{ color: colors.accentDefault }}>ready.</Text>
             </Text>
             <Text style={styles.copy}>
-              One more thing: the ↩ button up top always brings back the last
-              song, in case you swipe too fast.
+              Four swipes and a hold. The ↩ button up top always brings back
+              the last song, in case you go too fast.
             </Text>
           </Animated.View>
         )}
       </View>
 
       <View style={styles.dots}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
+        {Array.from({ length: LAST_STEP + 1 }, (_, i) => (
           <Dot key={i} on={i <= step} />
         ))}
       </View>
@@ -413,7 +545,7 @@ export function Onboarding({
           <Text style={styles.primaryText}>Show me how</Text>
         </Pressable>
       )}
-      {step > 0 && step < 5 && (
+      {step > TASTE_STEPS && step < HOLD_STEP && (
         <Pressable
           style={[styles.primary, { opacity: 0.25 }]}
           disabled={demoTrack !== null}
@@ -424,7 +556,22 @@ export function Onboarding({
           <Text style={styles.primaryText}>Swipe the card to continue</Text>
         </Pressable>
       )}
-      {step === 5 && (
+      {step === HOLD_STEP && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.primary,
+            !mood && demoTracks.length > 0 && { opacity: 0.25 },
+            pressed && styles.primaryPressed,
+          ]}
+          disabled={!mood && demoTracks.length > 0}
+          onPress={() => setStep(LAST_STEP)}
+        >
+          <Text style={styles.primaryText}>
+            {mood || demoTracks.length === 0 ? "Next" : "Hold the card to continue"}
+          </Text>
+        </Pressable>
+      )}
+      {step === LAST_STEP && (
         <Pressable
           style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
           onPress={finish}
@@ -433,13 +580,30 @@ export function Onboarding({
         </Pressable>
       )}
 
-      {step < 5 ? (
+      {step < LAST_STEP ? (
         <Pressable style={styles.skip} hitSlop={8} onPress={finish}>
           <Text style={styles.skipText}>Skip the tour</Text>
         </Pressable>
       ) : (
         <View style={styles.skip} />
       )}
+
+      {ring && step === HOLD_STEP ? (
+        <MoodWheel
+          origin={ring}
+          host={host}
+          aim={aim}
+          picked={mood}
+          active={mood}
+          verdict={null}
+          dragging={dragging}
+          onCommit={(m) => {
+            setMood(m);
+            closeRing();
+          }}
+          onCancel={closeRing}
+        />
+      ) : null}
 
       <StatusBar style="light" />
     </SafeAreaView>

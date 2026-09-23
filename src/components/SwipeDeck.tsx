@@ -41,9 +41,9 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import type { SaveTarget, SwipeDir, Track } from "../types";
-import type { MoodId } from "../data/mood";
+import { moodAtPush, type MoodId } from "../data/mood";
 import type { Verdict } from "../data/predict";
-import { MoodFan } from "./MoodFan";
+import { MoodWheel } from "./MoodWheel";
 import type { HapticsLevel, MotionLevel } from "../data/prefs";
 import { colors, fonts, gesture as GESTURE, radii } from "../design/tokens";
 import { DiscFX, type SaveFxData, type SaveRelease } from "./DiscFX";
@@ -464,11 +464,30 @@ export function SwipeDeck({
     };
   });
 
-  const [moodsOpen, setMoodsOpen] = useState(false);
+  /** the emote wheel: where it opened, and which face the finger is on */
+  const [wheel, setWheel] = useState<{ x: number; y: number } | null>(null);
+  const [aim, setAim] = useState<MoodId | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const closeWheel = useCallback(() => {
+    setWheel(null);
+    setAim(null);
+    setDragging(false);
+  }, []);
+  /** dead zone in screen px — below this, a release cancels */
+  /** push less than this (px) and nothing is selected — release cancels */
+  const DEAD = 38;
+  /**
+   * The ring is drawn inside this deck's wrapper, which does not start at the
+   * window's origin (status bar, top bar). Gesture coordinates are window
+   * coordinates, so the wrapper's own window position is measured and handed
+   * to the ring — otherwise it opens a status-bar's height below the thumb.
+   */
+  const wrapRef = useRef<View>(null);
+  const [host, setHost] = useState({ x: 0, y: 0, width: SCREEN_W, height: SCREEN_H });
   // The fan labels one specific song. If the card moves on under it — a swipe,
   // a revert, an auto-advance — the question is about a card nobody is looking
   // at, so it closes rather than quietly retargeting.
-  useEffect(() => setMoodsOpen(false), [onDeck?.id]);
+  useEffect(() => closeWheel(), [onDeck?.id, closeWheel]);
 
   const pan = Gesture.Pan()
     .requireExternalGestureToFail(scrubPan)
@@ -508,12 +527,55 @@ export function SwipeDeck({
    * is exactly the distinction a thumb makes, so RNGH can enforce it instead of
    * us measuring pixels by hand. 12px of slack covers a real thumb's wobble.
    */
-  const longPress = Gesture.LongPress()
-    .minDuration(420)
-    .maxDistance(12)
-    .onStart(() => {
-      runOnJS(setMoodsOpen)(true);
+  /**
+   * The wheel is a Pan that refuses to activate until the finger has been
+   * still for 420ms — which is exactly the emote-wheel gesture, and the reason
+   * RNGH ships `activateAfterLongPress`. The same finger that opened it keeps
+   * delivering updates, so there is no hand-off and nothing to re-acquire.
+   */
+  const openWheel = useCallback(
+    (x: number, y: number) => {
+      wrapRef.current?.measureInWindow((hx, hy, width, height) =>
+        setHost({ x: hx, y: hy, width, height }),
+      );
+      setWheel({ x, y });
+      setAim(null);
+      setDragging(true);
+    },
+    [],
+  );
+  const aimWheel = useCallback(
+    (dx: number, dy: number) => setAim(moodAtPush(dx, dy, DEAD)),
+    [DEAD],
+  );
+  const releaseWheel = useCallback(() => setDragging(false), []);
+
+  /**
+   * Release commits whatever the finger was pointing at; release in the dead
+   * zone leaves the wheel up to be tapped instead. A gesture that cancels on
+   * an imprecise release would punish the hand it was designed for.
+   */
+  const wasDragging = useRef(false);
+  useEffect(() => {
+    if (wasDragging.current && !dragging && aim && onDeck) {
+      onPickMood(aim, onDeck.id);
+      closeWheel();
+    }
+    wasDragging.current = dragging;
+  }, [dragging, aim, onDeck, onPickMood, closeWheel]);
+
+  const wheelPan = Gesture.Pan()
+    .activateAfterLongPress(420)
+    .onStart((e) => {
+      runOnJS(openWheel)(e.absoluteX, e.absoluteY);
+    })
+    .onUpdate((e) => {
+      runOnJS(aimWheel)(e.translationX, e.translationY);
+    })
+    .onEnd(() => {
+      runOnJS(releaseWheel)();
     });
+  const longPress = wheelPan;
   const cardGesture = useMemo(
     () => Gesture.Race(longPress, pan),
     // both are rebuilt on every render by RNGH's builders; the race only needs
@@ -638,7 +700,7 @@ export function SwipeDeck({
   ) : null;
 
   return (
-    <View style={styles.wrap}>
+    <View ref={wrapRef} style={styles.wrap}>
       <View style={styles.deck} onLayout={onDeckLayout}>
         {/* deepest card paints first; keys keep identity across promotions */}
         {tracks
@@ -736,16 +798,20 @@ export function SwipeDeck({
         <ActionButton icon="zap" color={colors.more} label="more like this" onPress={() => handleDir("right")} />
       </View>
 
-      {moodsOpen && onDeck ? (
-        <MoodFan
-          title={onDeck.title}
+      {wheel && onDeck ? (
+        <MoodWheel
+          origin={wheel}
+          host={host}
+          aim={aim}
           picked={pickedMood}
           active={activeMood}
           verdict={verdict}
-          haptics={haptics}
-          onPick={(mood) => onPickMood(mood, onDeck.id)}
-          onClear={onClearMood}
-          onClose={() => setMoodsOpen(false)}
+          dragging={dragging}
+          onCommit={(mood) => {
+            onPickMood(mood, onDeck.id);
+            closeWheel();
+          }}
+          onCancel={closeWheel}
         />
       ) : null}
     </View>
