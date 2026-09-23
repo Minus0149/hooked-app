@@ -19,12 +19,16 @@ import {
 import { coercePrefs, DEFAULT_PREFS, type UserPrefs } from "../data/prefs";
 import {
   buildQueue,
+  MODEL_PLACES,
+  MOOD_PLACES,
   rankPool,
   shuffle,
   spreadAlbums,
   uniqueById,
   type Steer,
 } from "../data/ranking";
+import { coerceMood, type CrowdMoods, type MoodId } from "../data/mood";
+import { trainFromHistory, type TasteModel } from "../data/predict";
 
 /**
  * The signals this listener's deck answers to, gathered from state.
@@ -39,14 +43,53 @@ function sameScores(a: Record<string, number>, b: Record<string, number>): boole
   return keys.every((k) => a[k] === b[k]);
 }
 
-function steerOf(
-  state: Pick<AppState, "taste" | "boostGenres" | "affinity" | "affinityStrength">,
-): Steer {
+/**
+ * The model this device trains on its own listener, rebuilt only when the
+ * evidence behind it moved. Same memo as the web store, same reason: training
+ * is a couple of milliseconds, which is nothing once and a lot every swipe.
+ */
+let modelCache: { key: string; model: TasteModel | null } | null = null;
+
+function modelFor(state: AppState): TasteModel | null {
+  const skipped = Object.keys(state.deckMemory).filter(
+    (id) => state.deckMemory[id].skips > 0,
+  );
+  const key = [
+    state.liked.length,
+    state.discoveries.length,
+    state.playlists.map((p) => p.tracks.length).join(","),
+    state.neverTracks.length,
+    skipped.length,
+    state.catalog.length,
+    Object.keys(state.crowdMoods).length,
+  ].join("|");
+  if (modelCache && modelCache.key === key) return modelCache.model;
+  const model = trainFromHistory({
+    saved: [
+      ...state.liked,
+      ...state.discoveries,
+      ...state.playlists.flatMap((p) => p.tracks),
+    ],
+    buried: state.neverTracks,
+    skipped,
+    catalog: state.catalog,
+    crowd: state.crowdMoods,
+  });
+  modelCache = { key, model };
+  return model;
+}
+
+function steerOf(state: AppState): Steer {
   return {
     taste: state.taste,
     boostGenres: state.boostGenres,
     affinity: state.affinity,
     affinityStrength: state.affinityStrength,
+    mood: state.mood,
+    moodStrength: state.moodStrength,
+    crowdMoods: state.crowdMoods,
+    model: modelFor(state),
+    modelStrength: state.modelStrength,
   };
 }
 
@@ -110,7 +153,29 @@ export interface AppState {
    * store build. Zero here and the deck is exactly what it was before.
    */
   affinityStrength: number;
+  /**
+   * The face they picked: a lens over the deck, and the only signal here about
+   * *now* rather than about them. Null is the normal state.
+   */
+  mood: MoodId | null;
+  /** When it was picked — a lens is honoured for MOOD_TTL, not forever. */
+  moodSetAt: number;
+  /** What THIS listener said each track feels like: trackId -> mood. */
+  moodPicks: Record<string, MoodId>;
+  /** What everyone else said, once enough of them agreed. Sparse. */
+  crowdMoods: CrowdMoods;
+  /** How far a mood may move a track, in places (runtime config). */
+  moodStrength: number;
+  /** How far the locally-trained model may move a track (runtime config). */
+  modelStrength: number;
 }
+
+/**
+ * How long a picked mood outlives the session that picked it: long enough that
+ * backgrounding the app doesn't undo an instruction, short enough that Friday
+ * night's "party" isn't still on the deck at Monday breakfast.
+ */
+const MOOD_TTL = 6 * 60 * 60 * 1000;
 
 type Persisted = Partial<
   Pick<
@@ -126,11 +191,18 @@ type Persisted = Partial<
     | "boostGenres"
     | "autoAdvance"
     | "deckMemory"
+    | "moodSetAt"
+    | "moodPicks"
   >
-> & { prefs?: Partial<UserPrefs> };
+> & { prefs?: Partial<UserPrefs>; mood?: unknown };
 
 type Action =
   | { type: "SWIPE"; action: SwipeAction }
+  // a face was pressed: on the deck (trackId set) it also labels that song
+  | { type: "SET_MOOD"; mood: MoodId | null; trackId?: string }
+  | { type: "APPLY_CROWD_MOODS"; crowd: CrowdMoods }
+  | { type: "APPLY_MOOD_PICKS"; picks: Record<string, MoodId> }
+  | { type: "SET_STRENGTHS"; mood: number; model: number }
   | { type: "BACK" }
   | { type: "JUMP_TO"; trackId: string }
   | { type: "SET_SAVE_TARGET"; target: SaveTarget }
@@ -230,8 +302,26 @@ const NO_AFFINITY: Pick<AppState, "affinity" | "affinityStrength"> = {
   affinityStrength: 0,
 };
 
+/**
+ * Mood defaults. Unlike affinity these are NOT zero: a face and a local model
+ * work offline, on the baked catalogue, for a listener who never signs in, so
+ * they are on until the runtime config says otherwise.
+ */
+const NO_MOOD: Pick<
+  AppState,
+  "mood" | "moodSetAt" | "moodPicks" | "crowdMoods" | "moodStrength" | "modelStrength"
+> = {
+  mood: null,
+  moodSetAt: 0,
+  moodPicks: {},
+  crowdMoods: {},
+  moodStrength: MOOD_PLACES,
+  modelStrength: MODEL_PLACES,
+};
+
 const initialState: AppState = {
   ...NO_AFFINITY,
+  ...NO_MOOD,
   catalog: BAKED,
   allowedIds: null,
   neverTracks: [],
@@ -242,6 +332,8 @@ const initialState: AppState = {
     taste: EMPTY_TASTE,
     boostGenres: [],
     ...NO_AFFINITY,
+    ...NO_MOOD,
+    model: null,
   }),
   history: [],
   liked: [],
@@ -278,6 +370,13 @@ function reducer(state: AppState, action: Action): AppState {
         saveTarget: action.payload.saveTarget ?? "liked",
         autoAdvance: action.payload.autoAdvance ?? true,
         deckMemory: action.payload.deckMemory ?? {},
+        // a lens survives being backgrounded, but not a night's sleep
+        moodSetAt: action.payload.moodSetAt ?? 0,
+        mood:
+          Date.now() - (action.payload.moodSetAt ?? 0) < MOOD_TTL
+            ? coerceMood(action.payload.mood)
+            : null,
+        moodPicks: (action.payload.moodPicks ?? {}) as Record<string, MoodId>,
         hydrated: true,
       };
       const inLibrary = libraryIds(merged);
@@ -340,6 +439,45 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
 
+    case "SET_MOOD": {
+      const mood = action.mood;
+      const moodPicks =
+        action.trackId && mood
+          ? { ...state.moodPicks, [action.trackId]: mood }
+          : state.moodPicks;
+      if (mood === state.mood && moodPicks === state.moodPicks) return state;
+      const next = { ...state, mood, moodSetAt: mood ? Date.now() : 0, moodPicks };
+      // Re-ranks behind the visible card, like a right-swipe: a face was
+      // pressed on purpose a moment ago, and a deck that didn't visibly answer
+      // would make the gesture look decorative.
+      const [head, ...rest] = state.queue;
+      if (!head) return next;
+      return {
+        ...next,
+        queue: spreadAlbums(uniqueById([head, ...rankPool(rest, steerOf(next))])),
+      };
+    }
+
+    case "APPLY_CROWD_MOODS": {
+      const sameSize =
+        Object.keys(state.crowdMoods).length === Object.keys(action.crowd).length;
+      if (sameSize && Object.keys(action.crowd).every((id) => state.crowdMoods[id]))
+        return state;
+      return { ...state, crowdMoods: action.crowd };
+    }
+
+    case "APPLY_MOOD_PICKS": {
+      // the device's own picks win: they may have been made since the query left
+      const picks = { ...action.picks, ...state.moodPicks };
+      if (Object.keys(picks).length === Object.keys(state.moodPicks).length) return state;
+      return { ...state, moodPicks: picks };
+    }
+
+    case "SET_STRENGTHS":
+      if (state.moodStrength === action.mood && state.modelStrength === action.model)
+        return state;
+      return { ...state, moodStrength: action.mood, modelStrength: action.model };
+
     case "APPLY_AFFINITY": {
       // Deliberately does NOT rebuild the queue. The model's opinion is worth
       // a few places, not worth the cards under someone's thumb rearranging
@@ -396,6 +534,8 @@ function reducer(state: AppState, action: Action): AppState {
           taste: EMPTY_TASTE,
           boostGenres: [],
           ...NO_AFFINITY,
+          ...NO_MOOD,
+          model: null,
         }),
         hydrated: true,
       };
@@ -726,6 +866,13 @@ interface StoreValue {
   resetLocal: () => void;
   applyCatalog: (tracks: Track[]) => void;
   applyAffinity: (scores: Record<string, number>, strength: number) => void;
+  /** Pick a face. Pass a trackId when it was pressed on a card — that labels it. */
+  setMood: (mood: MoodId | null, trackId?: string) => void;
+  applyCrowdMoods: (crowd: CrowdMoods) => void;
+  applyMoodPicks: (picks: Record<string, MoodId>) => void;
+  setStrengths: (mood: number, model: number) => void;
+  /** What this device has learned about this listener, or null before evidence. */
+  model: TasteModel | null;
   catalog: Track[];
 }
 
@@ -768,6 +915,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       boostGenres,
       autoAdvance,
       deckMemory,
+      mood,
+      moodSetAt,
+      moodPicks,
     } = state;
     void AsyncStorage.setItem(
       PERSIST_KEY,
@@ -784,6 +934,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         boostGenres,
         autoAdvance,
         deckMemory,
+        mood,
+        moodSetAt,
+        moodPicks,
       }),
     );
   }, [
@@ -814,6 +967,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       applyCatalog: (tracks: Track[]) => dispatch({ type: "APPLY_CATALOG", tracks }),
       applyAffinity: (scores: Record<string, number>, strength: number) =>
         dispatch({ type: "APPLY_AFFINITY", scores, strength }),
+      setMood: (mood: MoodId | null, trackId?: string) =>
+        dispatch({ type: "SET_MOOD", mood, trackId }),
+      applyCrowdMoods: (crowd: CrowdMoods) =>
+        dispatch({ type: "APPLY_CROWD_MOODS", crowd }),
+      applyMoodPicks: (picks: Record<string, MoodId>) =>
+        dispatch({ type: "APPLY_MOOD_PICKS", picks }),
+      setStrengths: (mood: number, model: number) =>
+        dispatch({ type: "SET_STRENGTHS", mood, model }),
       setReplay: (container: string, allow: boolean) =>
         dispatch({ type: "SET_REPLAY", container, allow }),
       unbury: (trackId: string) => dispatch({ type: "UNBURY", trackId }),
@@ -848,7 +1009,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(
-    () => ({ state, ...actions, catalog: state.catalog }),
+    () => ({ state, ...actions, model: modelFor(state), catalog: state.catalog }),
     [state, actions],
   );
 

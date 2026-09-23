@@ -1,8 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SettingsPage } from "./SettingsPage";
-import { GroupLabel, Row, Toggle } from "./kit";
+import { GroupLabel, Row, Segmented, Toggle } from "./kit";
 import { useStore } from "../../state/store";
 import { colors, fonts } from "../../design/tokens";
+import {
+  DAYPART_COPY,
+  DAYPART_MOOD,
+  daypartAt,
+  moodById,
+  MOOD_BY_TIME,
+  type MoodByTime,
+} from "../../data/mood";
 
 /**
  * Settings → Playback: what happens when a song ends and how loud it plays.
@@ -20,7 +28,8 @@ export function PlaybackPage({
   volume: number;
   onVolume: (v: number) => void;
 }) {
-  const { state, setAutoAdvance } = useStore();
+  const { state, setAutoAdvance, setPrefs } = useStore();
+  const part = daypartAt();
 
   const targetLabel =
     state.saveTarget === "liked"
@@ -68,6 +77,19 @@ export function PlaybackPage({
         </View>
         <Text style={styles.volValue}>{Math.round(volume * 100)}%</Text>
       </View>
+
+      <GroupLabel>time of day</GroupLabel>
+      <View style={styles.moodBlock}>
+        <Segmented<MoodByTime>
+          options={MOOD_BY_TIME}
+          value={state.prefs.moodByTime}
+          onChange={(moodByTime) => setPrefs({ moodByTime })}
+        />
+        <Text style={styles.moodHint}>
+          {MOOD_BY_TIME.find((o) => o.id === state.prefs.moodByTime)?.copy}
+          {` — right now that's ${moodById(DAYPART_MOOD[part])?.label.toLowerCase()}, because it's ${DAYPART_COPY[part].label}`}
+        </Text>
+      </View>
     </SettingsPage>
   );
 }
@@ -84,6 +106,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
     gap: 10,
+  },
+  moodBlock: { gap: 10, marginBottom: 8 },
+  moodHint: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.muted,
   },
   volRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   volIcon: { color: colors.muted, fontSize: 18, width: 14, textAlign: "center" },

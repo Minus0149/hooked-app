@@ -23,6 +23,7 @@ import * as Haptics from "expo-haptics";
 import {
   Gesture,
   GestureDetector,
+  type ComposedGesture,
   type PanGesture,
 } from "react-native-gesture-handler";
 import Animated, {
@@ -40,6 +41,9 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import type { SaveTarget, SwipeDir, Track } from "../types";
+import type { MoodId } from "../data/mood";
+import type { Verdict } from "../data/predict";
+import { MoodFan } from "./MoodFan";
 import type { HapticsLevel, MotionLevel } from "../data/prefs";
 import { colors, fonts, gesture as GESTURE, radii } from "../design/tokens";
 import { DiscFX, type SaveFxData, type SaveRelease } from "./DiscFX";
@@ -98,7 +102,8 @@ const DeckCard = memo(function DeckCard({
   x: SharedValue<number>;
   y: SharedValue<number>;
   topId: SharedValue<string>;
-  cardGesture: PanGesture | null; // null below the top card
+  // the top card's pan raced against its long press; null below the top card
+  cardGesture: ComposedGesture | PanGesture | null;
   chrome: ReactNode; // stamps/meta/scrubber — only the top card gets these
 }) {
   // every non-top card gets its OWN disabled gesture: sharing one instance
@@ -214,6 +219,11 @@ export function SwipeDeck({
   sensitivity = 1,
   motion = "full",
   haptics = "subtle",
+  activeMood,
+  pickedMood,
+  verdict,
+  onPickMood,
+  onClearMood,
 }: {
   tracks: Track[]; // [onDeck, next, nextNext]
   backToken: number; // bumped by ↩ — cancels any in-flight save FX
@@ -238,6 +248,14 @@ export function SwipeDeck({
   sensitivity?: number;
   motion?: MotionLevel;
   haptics?: HapticsLevel;
+  /** the lens currently on the deck */
+  activeMood: MoodId | null;
+  /** what this listener already said the song on deck feels like */
+  pickedMood: MoodId | null;
+  /** the local model's read on the song on deck, or null before it has one */
+  verdict: Verdict | null;
+  onPickMood: (mood: MoodId, trackId: string) => void;
+  onClearMood: () => void;
 }) {
   const [onDeck, next, nextNext] = tracks;
   // live dims: module-scope Dimensions went stale on rotation/foldables and
@@ -446,6 +464,12 @@ export function SwipeDeck({
     };
   });
 
+  const [moodsOpen, setMoodsOpen] = useState(false);
+  // The fan labels one specific song. If the card moves on under it — a swipe,
+  // a revert, an auto-advance — the question is about a card nobody is looking
+  // at, so it closes rather than quietly retargeting.
+  useEffect(() => setMoodsOpen(false), [onDeck?.id]);
+
   const pan = Gesture.Pan()
     .requireExternalGestureToFail(scrubPan)
     .onUpdate((e) => {
@@ -475,6 +499,27 @@ export function SwipeDeck({
         vy: e.velocityY,
       });
     });
+
+  /**
+   * Hold the card to open the faces.
+   *
+   * Raced, not simultaneous: a hold with no movement activates the long press
+   * and cancels the pan; a swipe activates the pan and cancels the hold. That
+   * is exactly the distinction a thumb makes, so RNGH can enforce it instead of
+   * us measuring pixels by hand. 12px of slack covers a real thumb's wobble.
+   */
+  const longPress = Gesture.LongPress()
+    .minDuration(420)
+    .maxDistance(12)
+    .onStart(() => {
+      runOnJS(setMoodsOpen)(true);
+    });
+  const cardGesture = useMemo(
+    () => Gesture.Race(longPress, pan),
+    // both are rebuilt on every render by RNGH's builders; the race only needs
+    // to be re-composed when either identity changes
+    [longPress, pan],
+  );
 
   const upStamp = useAnimatedStyle(() => ({
     opacity: interpolate(-y.value, [36, 110], [0, 1]),
@@ -551,6 +596,13 @@ export function SwipeDeck({
       <View style={styles.meta}>
         <View style={[styles.genre, { backgroundColor: onDeck.accent }]}>
           <Text style={styles.genreText}>{onDeck.genre.toUpperCase()}</Text>
+          {verdict?.worthShowing && verdict.chance >= 0.7 ? (
+            // only when the model has both earned an opinion and formed a
+            // strong one — a badge on every card would be wallpaper
+            <Text style={styles.matchText}>
+              {`  ${Math.round(verdict.chance * 100)}% YOU`}
+            </Text>
+          ) : null}
         </View>
         <Text style={styles.title} numberOfLines={2}>
           {onDeck.title}
@@ -601,7 +653,7 @@ export function SwipeDeck({
               x={x}
               y={y}
               topId={topId}
-              cardGesture={i === 0 ? pan : null}
+              cardGesture={i === 0 ? cardGesture : null}
               chrome={i === 0 ? chrome : null}
             />
           ))}
@@ -683,6 +735,19 @@ export function SwipeDeck({
         <ActionButton icon="heart" color={colors.save} label="save" onPress={() => handleDir("down")} />
         <ActionButton icon="zap" color={colors.more} label="more like this" onPress={() => handleDir("right")} />
       </View>
+
+      {moodsOpen && onDeck ? (
+        <MoodFan
+          title={onDeck.title}
+          picked={pickedMood}
+          active={activeMood}
+          verdict={verdict}
+          haptics={haptics}
+          onPick={(mood) => onPickMood(mood, onDeck.id)}
+          onClear={onClearMood}
+          onClose={() => setMoodsOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -798,6 +863,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radii.pill,
+  },
+  matchText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9.5,
+    letterSpacing: 1,
+    color: colors.ink,
+    opacity: 0.68,
   },
   genreText: {
     fontSize: 10,

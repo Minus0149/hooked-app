@@ -13,6 +13,8 @@ import type { LibraryContainer, Track } from "../types";
 import { colors, fonts, mixHex, radii } from "../design/tokens";
 import { art } from "../lib/art";
 import { Eq } from "./Eq";
+import { Face } from "./faces";
+import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodsForHour } from "../data/mood";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -76,8 +78,22 @@ export function HomeScreen({
   onOpenLibrary: (container: LibraryContainer) => void;
   onNewPlaylist: () => void;
 }) {
-  const { state } = useStore();
+  const { state, setMood } = useStore();
   const { liked, discoveries, playlists, queue, boostGenres, catalog } = state;
+
+  /**
+   * The faces, out in the open.
+   *
+   * The long press on a card is the fast way in and an invisible one. This row
+   * is where the feature is actually discovered, and it answers the question
+   * somebody on the home screen is already asking — not "what does this song
+   * feel like" but "what do I want". Ordered by the hour, never filtered by it:
+   * the clock is a guess about a person, and it is wrong for anyone on nights.
+   */
+  const hour = useMemo(() => {
+    const part = daypartAt();
+    return { part, moods: moodsForHour(), suggested: DAYPART_MOOD[part] };
+  }, []);
 
   const fresh = useMemo(() => queue.slice(0, 10), [queue]);
 
@@ -139,6 +155,76 @@ export function HomeScreen({
         </View>
         <Eq color="#FFFFFF" playing />
       </Pressable>
+
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>What&apos;s the mood?</Text>
+        {state.prefs.moodByTime !== "off" ? (
+          <Text style={styles.sectionCount} numberOfLines={1}>
+            {DAYPART_COPY[hour.part].nudge}
+          </Text>
+        ) : null}
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.moodScroll}
+        contentContainerStyle={styles.moodRow}
+      >
+        {hour.moods.map((mood) => {
+          const isOn = state.mood === mood.id;
+          const isSuggested =
+            state.prefs.moodByTime !== "off" && mood.id === hour.suggested;
+          return (
+            <Pressable
+              key={mood.id}
+              style={({ pressed }) => [
+                styles.moodChip,
+                isSuggested && { borderColor: mixHex(mood.accent, colors.line, 0.55) },
+                isOn && { backgroundColor: mood.accent, borderColor: mood.accent },
+                pressed && { transform: [{ scale: 0.95 }] },
+              ]}
+              onPress={() => {
+                setMood(mood.id);
+                onDiscover();
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isOn }}
+              accessibilityLabel={`${mood.label} — ${mood.line}`}
+            >
+              <Face
+                mood={mood.id}
+                size={26}
+                color={isOn ? colors.ink : isSuggested ? mood.accent : colors.muted}
+              />
+              <Text
+                style={[
+                  styles.moodChipLabel,
+                  { color: isOn ? colors.ink : isSuggested ? mood.accent : colors.muted },
+                ]}
+                numberOfLines={1}
+              >
+                {mood.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          style={({ pressed }) => [
+            styles.moodChip,
+            state.mood === null && { borderColor: colors.muted },
+            pressed && { transform: [{ scale: 0.95 }] },
+          ]}
+          onPress={() => {
+            setMood(null);
+            onDiscover();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Anything — no mood on the deck"
+        >
+          <Text style={styles.moodAny}>∞</Text>
+          <Text style={[styles.moodChipLabel, { color: colors.muted }]}>Anything</Text>
+        </Pressable>
+      </ScrollView>
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Your library</Text>
@@ -305,6 +391,23 @@ const styles = StyleSheet.create({
   },
   sectionCount: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
   sectionAction: { fontFamily: fonts.bodyBold, fontSize: 12.5 },
+  moodScroll: { marginHorizontal: -20, marginBottom: 28 },
+  moodRow: { flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingBottom: 2 },
+  moodChip: {
+    width: 78,
+    minHeight: 78,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  moodChipLabel: { fontFamily: fonts.bodyBold, fontSize: 11.5 },
+  moodAny: { fontFamily: fonts.body, fontSize: 24, lineHeight: 26, color: colors.muted },
   tiles: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 28 },
   becauseWrap: { marginBottom: 4 },
   tile: {

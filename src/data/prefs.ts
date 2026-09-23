@@ -7,6 +7,8 @@
  * to look right.
  */
 
+import { coerceMoodByTime, type MoodByTime } from "./mood";
+
 export type MotionLevel = "full" | "reduced" | "off";
 export type HapticsLevel = "off" | "subtle" | "full";
 export type AccentMode = "track" | "custom";
@@ -35,6 +37,12 @@ export interface UserPrefs {
   adCadence: { unit: AdUnit; value: number } | null;
   /** Global discovery rules — the default strictness of the deck. Per-playlist
    * rules relax these further while that playlist is the save target. */
+  /**
+   * How much say the clock gets. "suggest" offers the hour's mood on Home and
+   * leaves the deck alone until it's taken; "always" leans the deck that way on
+   * its own; "off" means the time of day never touches anything.
+   */
+  moodByTime: MoodByTime;
   allowRepeats: boolean;
   includeBuried: boolean;
   includeBlockedArtists: boolean;
@@ -85,6 +93,7 @@ export const DEFAULT_PREFS: UserPrefs = {
   adsOptOut: false,
   adFrequency: "normal",
   adCadence: null,
+  moodByTime: "suggest",
   allowRepeats: false,
   includeBuried: false,
   includeBlockedArtists: false,
@@ -144,6 +153,7 @@ export function coercePrefs(raw: unknown): Partial<UserPrefs> {
       ? r.adFrequency
       : DEFAULT_PREFS.adFrequency;
   out.adCadence = coerceAdCadence(r.adCadence);
+  out.moodByTime = coerceMoodByTime(r.moodByTime);
   out.allowRepeats = r.allowRepeats === true;
   out.includeBuried = r.includeBuried === true;
   out.includeBlockedArtists = r.includeBlockedArtists === true;

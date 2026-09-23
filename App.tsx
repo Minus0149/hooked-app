@@ -35,6 +35,14 @@ import { ConvexReactClient, useConvex, useMutation, useQuery } from "convex/reac
 import { anyApi } from "convex/server";
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { coerceTaste } from "./src/data/taste";
+import {
+  coerceMood,
+  DAYPART_MOOD,
+  daypartAt,
+  type CrowdMoods,
+  type MoodId,
+} from "./src/data/mood";
+import { verdict as verdictFor } from "./src/data/predict";
 import { coercePrefs, type UserPrefs } from "./src/data/prefs";
 import { authClient } from "./src/lib/auth-client";
 import { StoreProvider, useStore } from "./src/state/store";
@@ -177,6 +185,11 @@ function Shell() {
     resetLocal,
     applyCatalog,
     applyAffinity,
+    setMood,
+    applyCrowdMoods,
+    applyMoodPicks,
+    setStrengths,
+    model,
     setReplay,
     unbury,
     unblockArtist,
@@ -259,9 +272,15 @@ function Shell() {
   ) as { creator: unknown; curator: boolean } | null | undefined;
 
   const runtimeCfg = useQuery(anyApi.runtime.get) as
-    | { gateFreeSwipes: number }
+    | { gateFreeSwipes: number; moodStrength: number; modelStrength: number }
     | null
     | undefined;
+
+  // the two dials for the client-side signals; offline the client defaults hold
+  useEffect(() => {
+    if (!runtimeCfg) return;
+    setStrengths(runtimeCfg.moodStrength, runtimeCfg.modelStrength);
+  }, [runtimeCfg, setStrengths]);
 
   /**
    * Ask the recommender what it makes of this listener.
@@ -298,6 +317,92 @@ function Shell() {
       live = false;
     };
   }, [convex, session.data?.user?.id, applyAffinity]);
+
+  /**
+   * What the catalogue's listeners have said songs feel like.
+   *
+   * One shot, like affinity: a stranger pressing a face three time zones away
+   * is not a reason to re-rank the card under this listener's thumb. Their own
+   * labels come with it, so the face they picked is still lit when the song
+   * comes round on another device.
+   */
+  const crowdFetched = useRef<string | null>(null);
+  useEffect(() => {
+    const uid = session.data?.user?.id ?? "guest";
+    if (crowdFetched.current === uid) return;
+    crowdFetched.current = uid;
+    let live = true;
+    void convex
+      .query(anyApi.moods.crowd, {})
+      .then((rows: { trackId: string; counts: { mood: string; n: number }[] }[] | null) => {
+        if (!live || !rows) return;
+        const crowd: CrowdMoods = {};
+        for (const row of rows) {
+          const counts: Partial<Record<MoodId, number>> = {};
+          for (const c of row.counts) {
+            const mood = coerceMood(c.mood);
+            if (mood) counts[mood] = c.n;
+          }
+          if (Object.keys(counts).length > 0) crowd[row.trackId] = counts;
+        }
+        applyCrowdMoods(crowd);
+      })
+      .catch(() => undefined);
+    if (session.data?.user?.id) {
+      void convex
+        .query(anyApi.moods.mine, {})
+        .then((rows: { trackId: string; mood: string }[] | null) => {
+          if (!live || !rows) return;
+          const picks: Record<string, MoodId> = {};
+          for (const row of rows) {
+            const mood = coerceMood(row.mood);
+            if (mood) picks[row.trackId] = mood;
+          }
+          applyMoodPicks(picks);
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      live = false;
+    };
+  }, [convex, session.data?.user?.id, applyCrowdMoods, applyMoodPicks]);
+
+  const voteMood = useMutation(anyApi.moods.vote);
+  /**
+   * A face was pressed on a card: steer this deck, and tell the catalogue.
+   *
+   * The local half is instant and unconditional — the ranking is the visible
+   * answer to the gesture and must not wait on a network. The vote is
+   * best-effort: a guest has no profile to attach one to, and a failed vote is
+   * a lost data point, not a broken interaction.
+   */
+  const pickMood = useCallback(
+    (mood: MoodId, trackId: string) => {
+      setMood(mood, trackId);
+      void voteMood({ trackId, mood }).catch(() => undefined);
+    },
+    [setMood, voteMood],
+  );
+
+  /** The clock, when they asked it to decide rather than to offer. */
+  const [daypart, setDaypart] = useState(() => daypartAt());
+  useEffect(() => {
+    const id = setInterval(() => setDaypart(daypartAt()), 5 * 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const autoApplied = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.prefs.moodByTime !== "always") return;
+    if (autoApplied.current === daypart) return;
+    autoApplied.current = daypart;
+    setMood(DAYPART_MOOD[daypart]);
+  }, [daypart, state.prefs.moodByTime, setMood]);
+
+  const deckTrack = state.queue[0] ?? null;
+  const deckVerdict = useMemo(
+    () => (deckTrack ? verdictFor(model, deckTrack, state.crowdMoods) : null),
+    [model, deckTrack, state.crowdMoods],
+  );
 
   useEffect(() => {
     // An empty catalogue is a REAL state (admin hid everything) — honour it
@@ -1158,6 +1263,11 @@ function Shell() {
             onSwipe={handleSwipe}
             gateSwipe={gateSwipe}
             sensitivity={state.prefs.swipeSensitivity}
+            activeMood={state.mood}
+            pickedMood={deckTrack ? state.moodPicks[deckTrack.id] ?? null : null}
+            verdict={deckVerdict}
+            onPickMood={pickMood}
+            onClearMood={() => setMood(null)}
             motion={state.prefs.motion}
             haptics={state.prefs.haptics}
           />
