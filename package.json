@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@better-auth/expo": "^1.6.16",
-    "@convex-dev/better-auth": "^0.12.3",
+    "@better-auth/expo": "^1.6.33",
+    "@convex-dev/better-auth": "^0.12.5",
     "@expo-google-fonts/instrument-sans": "^0.4.2",
     "@expo-google-fonts/unbounded": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
   Alert,
   AppState,
@@ -1178,7 +1178,7 @@ function Shell() {
                 setResent("sending");
                 void authClient
                   .sendVerificationEmail({ email, callbackURL: WEB_APP_URL })
-                  .then((r) => setResent(r?.error ? "failed" : "sent"))
+                  .then((r: { error?: unknown } | null) => setResent(r?.error ? "failed" : "sent"))
                   .catch(() => setResent("failed"));
               }}
             >
@@ -1446,7 +1446,12 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ConvexBetterAuthProvider client={convex} authClient={authClient}>
+        {/* cast at this one boundary: the adapter declares the prop's session
+            as `never`; the app's own session types stay intact elsewhere */}
+        <ConvexBetterAuthProvider
+          client={convex}
+          authClient={authClient as unknown as ComponentProps<typeof ConvexBetterAuthProvider>["authClient"]}
+        >
           {/* inside the providers, so recovering keeps the session and store */}
           <AppErrorBoundary>
             <StoreProvider>
