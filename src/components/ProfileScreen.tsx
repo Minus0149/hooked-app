@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
+import { WEB_APP_URL } from "../config/env";
 import { authClient } from "../lib/auth-client";
 import { useStore } from "../state/store";
 import { colors, fonts, radii } from "../design/tokens";
@@ -205,6 +206,8 @@ function AuthForm({ accent }: { accent: string }) {
             email: email.trim(),
             password,
             name: email.trim().split("@")[0],
+            // the confirmation link opens the web app; the phone rechecks on return
+            callbackURL: WEB_APP_URL,
           })
         : await authClient.signIn.email({ email: email.trim(), password });
     setBusy(false);

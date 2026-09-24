@@ -79,7 +79,7 @@ import {
 } from "./src/types";
 import { art } from "./src/lib/art";
 import { BUILD_TAG } from "./src/buildInfo";
-import { CONVEX_URL, SITE_URL } from "./src/config/env";
+import { CONVEX_URL, SITE_URL, WEB_APP_URL } from "./src/config/env";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
 const ANON_SWIPES_KEY = "hooked.anonSwipes.v1";
@@ -484,8 +484,11 @@ function Shell() {
    * never synced.
    */
   const [accessState, setAccessState] = useState<
-    "ok" | "pending" | "rejected" | "none" | null
+    "ok" | "pending" | "rejected" | "none" | "unverified" | null
   >(null);
+  // bumped by "I've confirmed it" to ask the server again
+  const [accessCheck, setAccessCheck] = useState(0);
+  const [resent, setResent] = useState<"idle" | "sending" | "sent" | "failed">("idle");
   useEffect(() => {
     if (profileStage === "signed-out") {
       setAccessState(null);
@@ -499,9 +502,10 @@ function Shell() {
         if (message.includes("ACCESS_PENDING")) setAccessState("pending");
         else if (message.includes("ACCESS_REJECTED")) setAccessState("rejected");
         else if (message.includes("ACCESS_NOT_REQUESTED")) setAccessState("none");
+        else if (message.includes("EMAIL_UNVERIFIED")) setAccessState("unverified");
         else setAccessState(null); // a network blip is not a rejection
       });
-  }, [profileStage, ensureProfile]);
+  }, [profileStage, ensureProfile, accessCheck]);
 
   useEffect(() => {
     if (signedIn) {
@@ -1142,6 +1146,10 @@ function Shell() {
         title: "hooked is invite-only",
         body: "Ask for access and we'll get back to you. It takes a minute.",
       },
+      unverified: {
+        title: "check your inbox",
+        body: `You're approved. We sent a confirmation link to ${session.data?.user?.email ?? "your email"} — open it, then come back here.`,
+      },
     }[accessState];
     return (
       <View style={[styles.root, styles.gate]}>
@@ -1156,6 +1164,35 @@ function Shell() {
           >
             <Text style={styles.gateButtonText}>ask for access</Text>
           </Pressable>
+        )}
+        {accessState === "unverified" && (
+          <>
+            <Pressable style={styles.gateButton} onPress={() => setAccessCheck((n) => n + 1)}>
+              <Text style={styles.gateButtonText}>I've confirmed it</Text>
+            </Pressable>
+            <Pressable
+              disabled={resent === "sending" || resent === "sent"}
+              onPress={() => {
+                const email = session.data?.user?.email;
+                if (!email) return;
+                setResent("sending");
+                void authClient
+                  .sendVerificationEmail({ email, callbackURL: WEB_APP_URL })
+                  .then((r) => setResent(r?.error ? "failed" : "sent"))
+                  .catch(() => setResent("failed"));
+              }}
+            >
+              <Text style={styles.gateLink}>
+                {resent === "sending"
+                  ? "sending…"
+                  : resent === "sent"
+                    ? "sent — give it a minute (and check spam)"
+                    : resent === "failed"
+                      ? "couldn't send — try again"
+                      : "resend the link"}
+              </Text>
+            </Pressable>
+          </>
         )}
         <Pressable onPress={() => void authClient.signOut()}>
           <Text style={styles.gateLink}>sign out</Text>
