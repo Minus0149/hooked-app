@@ -1,6 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
-  Alert,
   AppState,
   BackHandler,
   Image,
@@ -48,6 +47,7 @@ import {
   type MoodId,
 } from "./src/data/mood";
 import { MoodWheel } from "./src/components/MoodWheel";
+import { DialogProvider, useDialogs } from "./src/components/Dialogs";
 import { verdict as verdictFor } from "./src/data/predict";
 import { soundScore } from "./src/data/sound";
 import { coercePrefs, type UserPrefs } from "./src/data/prefs";
@@ -188,6 +188,7 @@ const toLocal = (t: ServerTrack): Track => ({
 });
 
 function Shell() {
+  const { confirm, notify } = useDialogs();
   const {
     state,
     swipe,
@@ -546,9 +547,9 @@ function Shell() {
       try {
         await deleteAccountMutation({});
       } catch (err) {
-        Alert.alert(
-          "Could not delete the account",
-          err instanceof Error ? err.message : "Try again in a moment.",
+        notify(
+          `Could not delete the account — ${err instanceof Error ? err.message : "try again in a moment"}`,
+          "error",
         );
         return;
       }
@@ -557,9 +558,9 @@ function Shell() {
       anonSwipeCount.current = 0;
       await authClient.signOut().catch(() => undefined);
       setStack(["home"]);
-      Alert.alert("Account deleted", "Everything tied to your account is gone.");
+      notify("Account deleted — everything tied to it is gone.", "success");
     })();
-  }, [deleteAccountMutation, resetLocal]);
+  }, [deleteAccountMutation, resetLocal, notify]);
 
   /** Local first so the toggle is instant; the server is the record of truth. */
   const handleReplay = useCallback(
@@ -590,12 +591,16 @@ function Shell() {
 
   const promptAuth = useCallback(
     (message: string) => {
-      Alert.alert("Create an account", message, [
-        { text: "Not now", style: "cancel" },
-        { text: "Sign in", onPress: () => push("profile") },
-      ]);
+      void confirm({
+        title: "Create an account",
+        body: message,
+        cancelLabel: "Not now",
+        confirmLabel: "Sign in",
+      }).then((ok) => {
+        if (ok) push("profile");
+      });
     },
-    [push],
+    [push, confirm],
   );
 
   /** The login wall refuses BEFORE anything commits — web parity. */
@@ -1545,7 +1550,9 @@ export default function App() {
           {/* inside the providers, so recovering keeps the session and store */}
           <AppErrorBoundary>
             <StoreProvider>
-              <Shell />
+              <DialogProvider>
+                <Shell />
+              </DialogProvider>
             </StoreProvider>
           </AppErrorBoundary>
         </ConvexBetterAuthProvider>

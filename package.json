@@ -41,7 +41,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "check": "node scripts/check-mojibake.mjs && node scripts/check-api-paths.mjs && node scripts/check-mirrors.mjs && node scripts/check-backend.mjs && tsc --noEmit"
+    "check": "node scripts/check-mojibake.mjs && node scripts/check-api-paths.mjs && node scripts/check-mirrors.mjs && node scripts/check-backend.mjs && node scripts/check-no-native-dialogs.mjs && tsc --noEmit"
   },
   "private": true
 }

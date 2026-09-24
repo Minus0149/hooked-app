@@ -1,6 +1,5 @@
 ﻿import { memo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -17,6 +16,7 @@ import { useStore } from "../state/store";
 import type { LibraryContainer, Track } from "../types";
 import { colors, fonts, mixHex, radii, withAlpha } from "../design/tokens";
 import { art } from "../lib/art";
+import { useDialogs } from "./Dialogs";
 
 function totalMinutes(tracks: Track[]) {
   // previews are ~30s each; show the full-song runtime for flavor
@@ -108,6 +108,7 @@ export function LibraryScreen({
   onDeletePlaylist: (id: string) => void;
   onDiscoverInto: (container: LibraryContainer) => void;
 }) {
+  const { confirm, notify } = useDialogs();
   const { state, updatePlaylistRules } = useStore();
   const updateRulesOnServer = useMutation(anyApi.library.updatePlaylistRules);
   const [showRules, setShowRules] = useState(false);
@@ -148,22 +149,16 @@ export function LibraryScreen({
   const collage = tracks.slice(0, 4);
   const isSaveTarget = state.saveTarget === container;
 
-  const confirmDelete = () => {
-    Alert.alert(
-      "Delete playlist",
-      `Delete "${title}"? The songs leave your library too.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            onDeletePlaylist(playlistId!);
-            onBack();
-          },
-        },
-      ],
-    );
+  const confirmDelete = async () => {
+    const ok = await confirm({
+      title: `Delete “${title}”?`,
+      body: "The songs in it leave your library too.",
+      confirmLabel: "Delete playlist",
+      danger: true,
+    });
+    if (!ok) return;
+    onDeletePlaylist(playlistId!);
+    onBack();
   };
 
   const header = (

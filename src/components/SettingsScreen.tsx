@@ -1,4 +1,4 @@
-﻿import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+﻿import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useMutation, useQuery } from "convex/react";
@@ -7,6 +7,7 @@ import { useStore } from "../state/store";
 import { AD_FREQUENCIES, AD_UNITS, AD_UNIT_BOUNDS } from "../data/prefs";
 import { colors, fonts, radii } from "../design/tokens";
 import { Row } from "./settings/kit";
+import { useDialogs } from "./Dialogs";
 
 /**
  * The Support module: what the house ads are, how often they run right now
@@ -14,6 +15,7 @@ import { Row } from "./settings/kit";
  * cards are what keeps an independent deck independent.
  */
 function SupportCard() {
+  const { confirm, notify } = useDialogs();
   const { state, setPrefs } = useStore();
   const optedOut = state.prefs.adsOptOut;
   const setPrefsMutation = useMutation(anyApi.library.setPrefs);
@@ -22,30 +24,16 @@ function SupportCard() {
     | null
     | undefined;
 
-  const confirmOptOut = () => {
-    Alert.alert(
-      "Before you go…",
-      "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing — but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
-      [
-        {
-          text: "Keep them on",
-          style: "default",
-          onPress: () => {
-            setPrefs({ adsOptOut: false });
-            void setPrefsMutation({
-              motion: state.prefs.motion,
-              haptics: state.prefs.haptics,
-              accentMode: state.prefs.accentMode,
-              accentColor: state.prefs.accentColor,
-              swipeSensitivity: state.prefs.swipeSensitivity,
-              adsOptOut: false,
-            }).catch(() => undefined);
-          },
-        },
-        {
-          text: "Turn them off anyway",
-          style: "destructive",
-          onPress: () => {
+  const confirmOptOut = async () => {
+    const turnOff = await confirm({
+      title: "Before you go…",
+      body:
+        "hooked has no investors and no label money. Those few quiet cards between songs pay for the servers and keep this deck independent.\n\nTurning them off costs you nothing — but if everyone does, the music goes quiet with them. Whatever you choose, it stays your call.",
+      cancelLabel: "Keep them on",
+      confirmLabel: "Turn them off",
+      danger: true,
+    });
+    if (turnOff) {
             setPrefs({ adsOptOut: true });
             void setPrefsMutation({
               motion: state.prefs.motion,
@@ -55,10 +43,17 @@ function SupportCard() {
               swipeSensitivity: state.prefs.swipeSensitivity,
               adsOptOut: true,
             }).catch(() => undefined);
-          },
-        },
-      ],
-    );
+    } else {
+            setPrefs({ adsOptOut: false });
+            void setPrefsMutation({
+              motion: state.prefs.motion,
+              haptics: state.prefs.haptics,
+              accentMode: state.prefs.accentMode,
+              accentColor: state.prefs.accentColor,
+              swipeSensitivity: state.prefs.swipeSensitivity,
+              adsOptOut: false,
+            }).catch(() => undefined);
+    }
   };
 
   return (

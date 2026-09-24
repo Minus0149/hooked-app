@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   FadeIn,
@@ -148,6 +148,17 @@ export function MoodWheel({
   // edge) would otherwise put its bottom face on top of the hint text
   const cy = Math.min(Math.max(fy, reach + 40), host.height - reach - HINT_ROOM);
 
+  // Back in the middle after pushing out is a change of mind: letting go
+  // there closes the ring and picks nothing. Released without ever moving, it
+  // stays up to be tapped. (A release ON a face is committed by the owner.)
+  const everAimed = useRef(false);
+  if (dragging && aim) everAimed.current = true;
+  const wasDragging = useRef(dragging);
+  useEffect(() => {
+    if (wasDragging.current && !dragging && !aim && everAimed.current) onCancel();
+    wasDragging.current = dragging;
+  }, [dragging, aim, onCancel]);
+
   const aimIndex = aim ? MOODS.findIndex((m) => m.id === aim) : -1;
   const lead = aimIndex >= 0 ? MOODS[aimIndex] : null;
   const labelBelow = cy - RING - BUBBLE / 2 - 58 < 0;
@@ -203,7 +214,11 @@ export function MoodWheel({
             </View>
           ) : (
             <Text style={styles.labelLine}>
-              {dragging ? "push toward a face" : "tap a face"}
+              {dragging
+                ? everAimed.current
+                  ? "let go here to cancel"
+                  : "push toward a face"
+                : "tap a face"}
             </Text>
           )}
         </View>

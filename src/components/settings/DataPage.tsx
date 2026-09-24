@@ -1,4 +1,5 @@
-import { Alert, Linking, Share } from "react-native";
+import { Linking, Share } from "react-native";
+import { useDialogs } from "../Dialogs";
 import { SettingsPage } from "./SettingsPage";
 import { GroupLabel, Row } from "./kit";
 import { useStore } from "../../state/store";
@@ -26,6 +27,7 @@ export function DataPage({
   signedIn: boolean;
   onDeleteAccount: () => void;
 }) {
+  const { confirm, notify } = useDialogs();
   const { state } = useStore();
 
   const exportData = async () => {
@@ -75,7 +77,7 @@ export function DataPage({
         sub="how your listening data is handled"
         onPress={() =>
           void Linking.openURL(`${SITE_URL}/privacy`).catch(() => {
-            Alert.alert("Could not open the privacy policy", `${SITE_URL}/privacy`);
+            notify(`Could not open the privacy policy — it's at ${SITE_URL}/privacy`, "error");
           })
         }
       />
@@ -93,16 +95,15 @@ export function DataPage({
         label="Reset local data"
         labelColor={colors.never}
         sub="clears your library and history on this device"
-        onPress={() =>
-          Alert.alert(
-            "Reset local data",
-            "Clear your local library and history on this device?",
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Reset", style: "destructive", onPress: onResetData },
-            ],
-          )
-        }
+        onPress={async () => {
+          const ok = await confirm({
+            title: "Clear this device?",
+            body: "Your local library and history on this phone are removed. Anything synced to your account stays.",
+            confirmLabel: "Clear",
+            danger: true,
+          });
+          if (ok) onResetData();
+        }}
       />
 
       {signedIn && (
@@ -114,16 +115,15 @@ export function DataPage({
             label="Delete my account"
             labelColor={colors.never}
             sub="removes your account and everything saved to it, for good"
-            onPress={() =>
-              Alert.alert(
-                "Delete your account?",
-                "Your profile, swipes, library and playlists are erased. This cannot be undone.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: onDeleteAccount },
-                ],
-              )
-            }
+            onPress={async () => {
+              const ok = await confirm({
+                title: "Delete your account?",
+                body: "Your profile, swipes, library and playlists are erased. This can't be undone.",
+                confirmLabel: "Delete my account",
+                danger: true,
+              });
+              if (ok) onDeleteAccount();
+            }}
           />
         </>
       )}
@@ -136,7 +136,7 @@ export function DataPage({
         sub={SITE_URL.replace(/^https?:\/\//, "")}
         onPress={() =>
           void Linking.openURL(SITE_URL).catch(() => {
-            Alert.alert("Could not open website", SITE_URL);
+            notify(`Could not open the website — it's at ${SITE_URL}`, "error");
           })
         }
       />
@@ -147,7 +147,7 @@ export function DataPage({
         sub={WEB_APP_URL.replace(/^https?:\/\//, "")}
         onPress={() =>
           void Linking.openURL(WEB_APP_URL).catch(() => {
-            Alert.alert("Could not open web app", WEB_APP_URL);
+            notify(`Could not open the web app — it's at ${WEB_APP_URL}`, "error");
           })
         }
       />
