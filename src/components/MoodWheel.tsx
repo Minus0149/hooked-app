@@ -187,16 +187,20 @@ export function MoodWheel({
           pointerEvents="none"
           style={[
             styles.label,
-            { top: labelBelow ? RING + BUBBLE / 2 + 12 : -(RING + BUBBLE / 2 + 52) },
+            // anchored by the edge nearest the ring, so a two-line label grows
+            // away from the faces instead of into the top one
+            labelBelow ? { top: RING + BUBBLE / 2 + 12 } : { bottom: RING + BUBBLE / 2 + 12 },
           ]}
         >
           {lead ? (
-            <>
-              <Text style={[styles.labelTitle, { color: lead.accent }]}>{lead.label}</Text>
-              <Text style={styles.labelLine} numberOfLines={1}>
+            // one card for both lines — the description alone over busy
+            // artwork was the hardest thing on screen to read
+            <View style={styles.labelCard}>
+              <Text style={[styles.labelCardTitle, { color: lead.accent }]}>{lead.label}</Text>
+              <Text style={styles.labelCardLine} numberOfLines={1}>
                 {lead.line}
               </Text>
-            </>
+            </View>
           ) : (
             <Text style={styles.labelLine}>
               {dragging ? "push toward a face" : "tap a face"}
@@ -226,7 +230,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 30,
-    backgroundColor: "rgba(3,3,5,0.52)",
+    // dark enough that the faces, not the album art, are what the eye finds
+    backgroundColor: "rgba(3,3,5,0.72)",
   },
   // a point, not a box: everything is laid out around (0,0), the finger
   ring: { position: "absolute", width: 0, height: 0, zIndex: 31 },
@@ -276,6 +281,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(8,8,12,0.7)",
   },
+  // a solid pill: bare text over the dimmed tab bar read as one jumbled line
   hint: {
     position: "absolute",
     left: 16,
@@ -284,5 +290,29 @@ const styles = StyleSheet.create({
     zIndex: 31,
     alignItems: "center",
   },
-  hintText: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted },
+  hintText: {
+    fontFamily: fonts.body,
+    fontSize: 12.5,
+    color: colors.text,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(8,8,12,0.9)",
+    borderWidth: 1,
+    borderColor: withAlpha(colors.text, 0.12),
+  },
+  labelCard: {
+    alignItems: "center",
+    gap: 1,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 7,
+    borderRadius: 16,
+    backgroundColor: "rgba(8,8,12,0.9)",
+    borderWidth: 1,
+    borderColor: withAlpha(colors.text, 0.12),
+  },
+  labelCardTitle: { fontFamily: fonts.displayBold, fontSize: 15 },
+  labelCardLine: { fontFamily: fonts.body, fontSize: 11.5, color: colors.muted },
 });

@@ -23,6 +23,7 @@ import {
   MOOD_PLACES,
   rankPool,
   shuffle,
+  keepOnScreen,
   spreadAlbums,
   uniqueById,
   type Steer,
@@ -504,11 +505,11 @@ function reducer(state: AppState, action: Action): AppState {
       // Keep the card being looked at if the server still carries it, and
       // rebuild the rest. Filtering the old queue instead would empty the deck
       // whenever the server list isn't a superset of the baked one.
+      // The card on screen stays even if the server doesn't carry it — see
+      // keepOnScreen in data/ranking.ts.
       const head = state.queue[0];
-      const allowed = new Set(ids);
-      const keepHead = head && allowed.has(head.id) ? head : null;
       const exclude = libraryIds(state);
-      if (keepHead) exclude.add(keepHead.id);
+      if (head) exclude.add(head.id);
 
       const rest = buildQueue(
         action.tracks,
@@ -520,7 +521,7 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         catalog: action.tracks,
         allowedIds: ids,
-        queue: spreadAlbums(uniqueById(keepHead ? [keepHead, ...rest] : rest)),
+        queue: keepOnScreen(head, spreadAlbums(uniqueById(rest))),
       };
     }
 
