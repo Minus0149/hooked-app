@@ -30,6 +30,7 @@ const MODULES = [
   "data/mood.ts",
   "data/predict.ts",
   "lib/authGate.ts",
+  "data/sound.ts",
 ];
 
 try {

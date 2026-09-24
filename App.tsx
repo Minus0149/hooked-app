@@ -49,6 +49,7 @@ import {
 } from "./src/data/mood";
 import { MoodWheel } from "./src/components/MoodWheel";
 import { verdict as verdictFor } from "./src/data/predict";
+import { soundScore } from "./src/data/sound";
 import { coercePrefs, type UserPrefs } from "./src/data/prefs";
 import { authClient } from "./src/lib/auth-client";
 import { StoreProvider, useStore } from "./src/state/store";
@@ -155,6 +156,10 @@ interface ServerCatalogTrack extends ServerTrack {
   hooks?: { id: string; startMs: number; durationMs: number; label?: string }[];
   markets?: string[];
   heat?: number;
+  energy?: number;
+  sound?: string;
+  audioMood?: number[];
+  vocal?: number;
 }
 
 const toLocalCatalog = (t: ServerCatalogTrack): Track => ({
@@ -163,6 +168,11 @@ const toLocalCatalog = (t: ServerCatalogTrack): Track => ({
   hooks: t.hooks,
   markets: t.markets,
   heat: t.heat,
+  // energy was never mapped here, so the phone's mood lens ran on genre alone
+  energy: t.energy,
+  sound: t.sound,
+  audioMood: t.audioMood,
+  vocal: t.vocal,
 });
 
 const toLocal = (t: ServerTrack): Track => ({
@@ -196,6 +206,7 @@ function Shell() {
     applyMoodPicks,
     setStrengths,
     model,
+    sound,
     setReplay,
     unbury,
     unblockArtist,
@@ -409,10 +420,15 @@ function Shell() {
   }, [daypart, state.prefs.moodByTime, setMood]);
 
   const deckTrack = state.queue[0] ?? null;
-  const deckVerdict = useMemo(
-    () => (deckTrack ? verdictFor(model, deckTrack, state.crowdMoods) : null),
-    [model, deckTrack, state.crowdMoods],
-  );
+  const deckVerdict = useMemo(() => {
+    if (!deckTrack) return null;
+    const v = verdictFor(model, deckTrack, state.crowdMoods);
+    // the labels can't hear; when the sound taste clearly agrees, say so
+    if (sound && sound.confidence >= 0.5 && soundScore(sound, deckTrack) > 0.35) {
+      return { ...v, reasons: [...v.reasons, "sounds like what you keep"].slice(0, 3) };
+    }
+    return v;
+  }, [model, sound, deckTrack, state.crowdMoods]);
 
   useEffect(() => {
     // An empty catalogue is a REAL state (admin hid everything) — honour it

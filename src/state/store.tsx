@@ -30,6 +30,7 @@ import {
 } from "../data/ranking";
 import { coerceMood, type CrowdMoods, type MoodId } from "../data/mood";
 import { trainFromHistory, type TasteModel } from "../data/predict";
+import { SOUND_PLACES, soundTaste, type SoundTaste } from "../data/sound";
 
 /**
  * The signals this listener's deck answers to, gathered from state.
@@ -80,6 +81,34 @@ function modelFor(state: AppState): TasteModel | null {
   return model;
 }
 
+let soundCache: { key: string; taste: SoundTaste | null } | null = null;
+
+/**
+ * The listener's taste vector, from the same history the model trains on.
+ * Rebuilt only when that history (or the catalogue it resolves against)
+ * changes — it's a few hundred multiply-adds, but it runs on every re-rank.
+ */
+function soundFor(state: AppState): SoundTaste | null {
+  const skipped = Object.keys(state.deckMemory).filter((id) => state.deckMemory[id].skips > 0);
+  const key = [
+    state.liked.length,
+    state.discoveries.length,
+    state.playlists.map((p) => p.tracks.length).join(","),
+    state.neverTracks.length,
+    skipped.length,
+    state.catalog.length,
+  ].join("|");
+  if (soundCache && soundCache.key === key) return soundCache.taste;
+  const taste = soundTaste({
+    saved: [...state.liked, ...state.discoveries, ...state.playlists.flatMap((p) => p.tracks)],
+    buried: state.neverTracks,
+    skipped,
+    catalog: state.catalog,
+  });
+  soundCache = { key, taste };
+  return taste;
+}
+
 function steerOf(state: AppState): Steer {
   return {
     taste: state.taste,
@@ -91,6 +120,8 @@ function steerOf(state: AppState): Steer {
     crowdMoods: state.crowdMoods,
     model: modelFor(state),
     modelStrength: state.modelStrength,
+    sound: soundFor(state),
+    soundStrength: SOUND_PLACES,
   };
 }
 
@@ -330,6 +361,8 @@ const initialState: AppState = {
   taste: EMPTY_TASTE,
   prefs: DEFAULT_PREFS,
   queue: buildQueue(BAKED, new Set(), [], {
+    sound: null, // no history yet, so no taste vector
+    soundStrength: SOUND_PLACES,
     taste: EMPTY_TASTE,
     boostGenres: [],
     ...NO_AFFINITY,
@@ -532,6 +565,8 @@ function reducer(state: AppState, action: Action): AppState {
         catalog: state.catalog,
         allowedIds: state.allowedIds,
         queue: buildQueue(state.catalog, new Set(), [], {
+          sound: null, // no history yet, so no taste vector
+          soundStrength: SOUND_PLACES,
           taste: EMPTY_TASTE,
           boostGenres: [],
           ...NO_AFFINITY,
@@ -874,6 +909,8 @@ interface StoreValue {
   setStrengths: (mood: number, model: number) => void;
   /** What this device has learned about this listener, or null before evidence. */
   model: TasteModel | null;
+  /** the listener's taste vector (data/sound.ts), or null before evidence */
+  sound: SoundTaste | null;
   catalog: Track[];
 }
 
@@ -1010,7 +1047,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(
-    () => ({ state, ...actions, model: modelFor(state), catalog: state.catalog }),
+    () => ({
+      state,
+      ...actions,
+      model: modelFor(state),
+      sound: soundFor(state),
+      catalog: state.catalog,
+    }),
     [state, actions],
   );
 
