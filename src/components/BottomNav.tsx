@@ -9,7 +9,7 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Svg, { Path } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
-import { colors, fonts, withAlpha } from "../design/tokens";
+import { colors, fonts, mixHex, withAlpha } from "../design/tokens";
 
 export type NavView = "home" | "discover";
 
@@ -173,7 +173,7 @@ export function BottomNav({
         {/* fixed-width slot keeps the tabs apart under the notch */}
         <View style={styles.fabSlot} />
         <NavButton
-          icon="compass"
+          icon="disc"
           label="Discover"
           active={view === "discover"}
           accent={accent}
@@ -190,9 +190,11 @@ export function BottomNav({
               accessibilityRole="button"
               accessibilityLabel="Create a playlist"
               accessibilityHint="Hold to pick a mood for a playlist"
-              style={[styles.fab, { backgroundColor: accent }, pressStyle]}
+              // dark and ringed, not a second pink button: "Start discovering"
+              // is the one filled accent on home
+              style={[styles.fab, { borderColor: mixHex(accent, colors.line, 0.55) }, pressStyle]}
             >
-              <Feather name="plus" size={26} color={colors.ink} />
+              <Feather name="plus" size={26} color={accent} />
             </Animated.View>
           </GestureDetector>
         </Animated.View>
@@ -249,8 +251,10 @@ const styles = StyleSheet.create({
     borderRadius: FAB / 2,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.surface2,
+    borderWidth: 1.5,
     shadowColor: "#000",
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.5,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,

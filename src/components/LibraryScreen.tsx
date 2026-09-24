@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { Sparkle } from "./icons";
 import Animated, { FadeInDown, FadeOutLeft } from "react-native-reanimated";
 import { useMutation } from "convex/react";
 import { anyApi } from "convex/server";
@@ -232,7 +233,7 @@ export function LibraryScreen({
           ]}
           onPress={() => onDiscoverInto(container)}
         >
-          <Feather name="zap" size={13} color={colors.text} />
+          <Sparkle size={14} color={colors.text} />
           <Text style={[styles.ctaText, { color: colors.text }]}>
             Discover into this
           </Text>

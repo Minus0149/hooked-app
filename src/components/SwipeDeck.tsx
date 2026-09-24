@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
+import { Sparkle } from "./icons";
 import * as Haptics from "expo-haptics";
 import {
   Gesture,
@@ -179,7 +180,7 @@ function ActionButton({
   label,
   onPress,
 }: {
-  icon: keyof typeof Feather.glyphMap;
+  icon: keyof typeof Feather.glyphMap | "sparkle";
   color: string;
   /** what the button does, announced to screen readers (web parity) */
   label: string;
@@ -193,7 +194,11 @@ function ActionButton({
       style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
       hitSlop={6}
     >
-      <Feather name={icon} size={21} color={color} />
+      {icon === "sparkle" ? (
+        <Sparkle size={22} color={color} />
+      ) : (
+        <Feather name={icon} size={21} color={color} />
+      )}
     </Pressable>
   );
 }
@@ -795,7 +800,7 @@ export function SwipeDeck({
           />
         </Pressable>
         <ActionButton icon="heart" color={colors.save} label="save" onPress={() => handleDir("down")} />
-        <ActionButton icon="zap" color={colors.more} label="more like this" onPress={() => handleDir("right")} />
+        <ActionButton icon="sparkle" color={colors.more} label="more like this" onPress={() => handleDir("right")} />
       </View>
 
       {wheel && onDeck ? (

@@ -32,6 +32,7 @@ const MODULES = [
   "lib/authGate.ts",
   "data/sound.ts",
   "lib/playlistMood.ts",
+  "lib/contrast.ts",
 ];
 
 try {

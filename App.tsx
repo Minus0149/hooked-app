@@ -84,7 +84,6 @@ import {
   type Track,
 } from "./src/types";
 import { art } from "./src/lib/art";
-import { BUILD_TAG } from "./src/buildInfo";
 import { CONVEX_URL, SITE_URL, WEB_APP_URL } from "./src/config/env";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
@@ -1325,6 +1324,8 @@ function Shell() {
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
               onPress={() => push("profile")}
+              accessibilityRole="button"
+              accessibilityLabel={signedIn ? "Your profile" : "Sign in"}
             >
               <Feather
                 name="user"
@@ -1338,6 +1339,8 @@ function Shell() {
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
               onPress={() => push("settings")}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
             >
               <Feather name="settings" size={18} color={colors.text} />
             </Pressable>
@@ -1362,6 +1365,8 @@ function Shell() {
               ]}
               disabled={!previous}
               onPress={handleBack}
+              accessibilityRole="button"
+              accessibilityLabel="Back to the last song"
             >
               {previous && (
                 <Image
@@ -1377,6 +1382,8 @@ function Shell() {
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
               onPress={() => setSaveSheetOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Where saves go"
             >
               <Feather
                 name={state.saveTarget === "liked" ? "heart" : "folder"}
@@ -1423,8 +1430,6 @@ function Shell() {
               }}
             />
           )}
-          {/* faint build tag: proves which bundle the device is running */}
-          <Text style={styles.buildTag}>{BUILD_TAG}</Text>
         </>
       )}
 
@@ -1442,7 +1447,9 @@ function Shell() {
         <SettingsScreen
           onBack={pop}
           onOpenStats={() => push("stats")}
+          onOpenProfile={() => push("profile")}
           signedIn={signedIn}
+          email={session.data?.user?.email ?? null}
           canViewStats={signedIn && (library?.isAdmin === true || creatorDash?.creator != null || creatorDash?.curator === true)}
           onOpen={(page) => push(`settings:${page}`)}
         />
@@ -1640,14 +1647,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   topBtnPressed: { transform: [{ scale: 0.92 }] },
-  buildTag: {
-    alignSelf: "center",
-    fontFamily: fonts.body,
-    fontSize: 9,
-    color: "#3A3A46",
-    marginTop: 2,
-    marginBottom: -2,
-  },
   // previous track's artwork fills the round back button under the back icon
   topBtnArt: {
     position: "absolute",

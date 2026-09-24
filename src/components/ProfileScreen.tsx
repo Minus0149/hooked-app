@@ -265,10 +265,7 @@ function AuthForm({ accent }: { accent: string }) {
 
         {/* 01 — identity */}
         <View style={styles.cluster}>
-          <View style={styles.clusterHead}>
-            <Text style={[styles.clusterNum, { color: accent, borderColor: accent }]}>01</Text>
-            <Text style={styles.clusterTitle}>who are you</Text>
-          </View>
+          <Text style={styles.clusterTitle}>email</Text>
           <TextInput
             style={styles.input}
             placeholder="you@example.com"
@@ -290,10 +287,7 @@ function AuthForm({ accent }: { accent: string }) {
 
         {/* 02 — the key */}
         <View style={styles.cluster}>
-          <View style={styles.clusterHead}>
-            <Text style={[styles.clusterNum, { color: accent, borderColor: accent }]}>02</Text>
-            <Text style={styles.clusterTitle}>the key</Text>
-          </View>
+          <Text style={styles.clusterTitle}>password</Text>
           <TextInput
             style={styles.input}
             placeholder={mode === "signup" ? "create a password" : "your password"}
@@ -492,36 +486,19 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 14,
   },
+  // plain labelled fields — the numbered boxes-in-a-card read as a form
+  // within a form (mirrors web's .auth-field)
   cluster: {
     width: "100%",
     alignSelf: "stretch",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 16,
-    padding: 16,
-    gap: 10,
-  },
-  clusterHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 2,
-  },
-  clusterNum: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    borderWidth: 1,
-    borderRadius: 999,
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    gap: 7,
   },
   clusterTitle: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 13,
-    color: colors.text,
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    color: colors.muted,
   },
   clusterHint: {
     fontFamily: fonts.bodyMedium,

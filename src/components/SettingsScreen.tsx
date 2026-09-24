@@ -6,7 +6,8 @@ import { anyApi } from "convex/server";
 import { useStore } from "../state/store";
 import { AD_FREQUENCIES, AD_UNITS, AD_UNIT_BOUNDS } from "../data/prefs";
 import { colors, fonts, radii } from "../design/tokens";
-import { Row } from "./settings/kit";
+import { GroupLabel, Row, RowGroup } from "./settings/kit";
+import { BUILD_TAG } from "../buildInfo";
 import { useDialogs } from "./Dialogs";
 
 /**
@@ -218,10 +219,15 @@ export function SettingsScreen({
   onBack,
   onOpen,
   onOpenStats,
+  onOpenProfile,
   signedIn,
+  email,
   canViewStats = false,
 }: {
   onBack: () => void;
+  onOpenProfile: () => void;
+  /** the signed-in account's address, when there is one */
+  email?: string | null;
   onOpen: (page: "appearance" | "playback" | "gestures" | "sound" | "data") => void;
   onOpenStats: () => void;
   signedIn: boolean;
@@ -258,58 +264,80 @@ export function SettingsScreen({
       >
         <Text style={styles.title}>Settings</Text>
 
-        <Row
-          icon="droplet"
-          iconColor={state.prefs.accentMode === "custom" ? state.prefs.accentColor : colors.accentDefault}
-          label="Appearance"
-          sub={`accent · motion ${motionLabel.toLowerCase()}`}
-          chevron
-          onPress={() => onOpen("appearance")}
-        />
-        <Row
-          icon="play"
-          iconColor={colors.more}
-          label="Playback"
-          sub={`auto-advance ${state.autoAdvance ? "on" : "off"} · save target`}
-          chevron
-          onPress={() => onOpen("playback")}
-        />
-        <Row
-          icon="move"
-          iconColor={colors.save}
-          label="Gestures"
-          sub={`swipe distance · haptics ${state.prefs.haptics}`}
-          chevron
-          onPress={() => onOpen("gestures")}
-        />
-        <Row
-          icon="music"
-          iconColor={colors.accentDefault}
-          label="Sound & taste"
-          sub="languages, genres, blocked artists, replays"
-          chevron
-          onPress={() => onOpen("sound")}
-        />
-        {canViewStats && (
+        {/* three short cards — the same groups, order and icons as web */}
+        <GroupLabel>listening</GroupLabel>
+        <RowGroup>
           <Row
-            icon="bar-chart-2"
+            icon="play"
             iconColor={colors.more}
-            label="Analytics"
-            sub="live deck numbers · your tracks"
+            label="Playback"
+            sub={`auto-advance ${state.autoAdvance ? "on" : "off"} · save target`}
             chevron
-            onPress={onOpenStats}
+            onPress={() => onOpen("playback")}
           />
+          <Row
+            icon="move"
+            iconColor={colors.save}
+            label="Gestures"
+            sub={`swipe distance · haptics ${state.prefs.haptics}`}
+            chevron
+            onPress={() => onOpen("gestures")}
+          />
+          <Row
+            icon="music"
+            iconColor={colors.accentDefault}
+            label="Sound & taste"
+            sub="languages, genres, blocked artists, replays"
+            chevron
+            onPress={() => onOpen("sound")}
+          />
+        </RowGroup>
+
+        <GroupLabel>you</GroupLabel>
+        <RowGroup>
+          <Row
+            icon="user"
+            label="Account"
+            sub={signedIn && email ? email : "sign in to keep your taste forever"}
+            chevron
+            onPress={onOpenProfile}
+          />
+          <Row
+            icon="droplet"
+            iconColor={state.prefs.accentMode === "custom" ? state.prefs.accentColor : colors.accentDefault}
+            label="Appearance"
+            sub={`accent · motion ${motionLabel.toLowerCase()}`}
+            chevron
+            onPress={() => onOpen("appearance")}
+          />
+          <Row
+            icon="shield"
+            label="Data & privacy"
+            sub="export, reset, delete account"
+            chevron
+            onPress={() => onOpen("data")}
+          />
+        </RowGroup>
+
+        {canViewStats && (
+          <>
+            <GroupLabel>hooked</GroupLabel>
+            <RowGroup>
+              <Row
+                icon="bar-chart-2"
+                iconColor={colors.more}
+                label="Analytics"
+                sub="live deck numbers · your tracks"
+                chevron
+                onPress={onOpenStats}
+              />
+            </RowGroup>
+          </>
         )}
 
-        <Row
-          icon="shield"
-          label="Data & privacy"
-          sub="export, reset, delete account"
-          chevron
-          onPress={() => onOpen("data")}
-        />
-
         <SupportCard />
+        {/* which bundle this phone is running — was a faint line on the deck */}
+        <Text style={styles.foot}>hooked. · {BUILD_TAG}</Text>
       </Animated.ScrollView>
     </View>
   );
@@ -341,12 +369,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   body: { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 4 },
+  foot: {
+    marginTop: 22,
+    marginBottom: 6,
+    textAlign: "center",
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: colors.muted,
+    opacity: 0.7,
+  },
   title: {
     fontFamily: fonts.display,
     fontSize: 24,
     letterSpacing: -0.5,
     color: colors.text,
-    marginBottom: 14,
+    marginBottom: 4,
   },
   support: {
     marginTop: 18,

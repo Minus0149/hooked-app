@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef } from "react";
+﻿import { useMemo } from "react";
 import {
   Image,
   Pressable,
@@ -14,6 +14,7 @@ import { colors, fonts, mixHex, radii } from "../design/tokens";
 import { art } from "../lib/art";
 import { Eq } from "./Eq";
 import { Face } from "./faces";
+import { inkOn } from "../lib/contrast";
 import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodsForHour } from "../data/mood";
 
 function greeting(): string {
@@ -131,22 +132,12 @@ export function HomeScreen({
   }, [boostGenres, liked, catalog, queue]);
 
 
-  // The row holds all six faces and runs off the side of the screen, so the
-  // mood you're in could be the one you can't see. The active chip is brought
-  // to the middle whenever the mood changes or the row first lays out.
-  const moodRowRef = useRef<ScrollView>(null);
-  const moodRowWidth = useRef(0);
-  const chipAt = useRef<Record<string, { x: number; width: number }>>({});
-  const centreActiveMood = (animated: boolean) => {
-    const at = state.mood ? chipAt.current[state.mood] : undefined;
-    if (!at || moodRowWidth.current === 0) return;
-    const x = Math.max(0, at.x - (moodRowWidth.current - at.width) / 2);
-    moodRowRef.current?.scrollTo({ x, animated });
-  };
-  useEffect(() => {
-    centreActiveMood(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.mood]);
+  // All seven choices fit in one row. It used to scroll sideways, which hid
+  // the mood you were in half the time and cut a face in half at the edge.
+  // dark or white text, whichever reads on this accent
+  const onAccent = inkOn(accent);
+  const libraryEmpty = liked.length === 0 && discoveries.length === 0 && playlists.length === 0;
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -167,26 +158,16 @@ export function HomeScreen({
         onPress={() => onDiscover()}
       >
         <View style={{ flex: 1 }}>
-          <Text style={styles.ctaLabel}>Start discovering</Text>
-          <Text style={styles.ctaSub}>{queue.length} songs queued for you</Text>
+          <Text style={[styles.ctaLabel, { color: onAccent }]}>Start discovering</Text>
+          <Text style={[styles.ctaSub, { color: onAccent }]}>{queue.length} songs queued for you</Text>
         </View>
-        <Eq color="#FFFFFF" playing />
+        <Eq color={onAccent} playing />
       </Pressable>
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>What&apos;s the mood?</Text>
       </View>
-      <ScrollView
-        ref={moodRowRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.moodScroll}
-        contentContainerStyle={styles.moodRow}
-        onLayout={(e) => {
-          moodRowWidth.current = e.nativeEvent.layout.width;
-          centreActiveMood(false);
-        }}
-      >
+      <View style={styles.moodRow}>
         {hour.moods.map((mood) => {
           const isOn = state.mood === mood.id;
           const isSuggested =
@@ -194,11 +175,6 @@ export function HomeScreen({
           return (
             <Pressable
               key={mood.id}
-              onLayout={(e) => {
-                const { x, width } = e.nativeEvent.layout;
-                chipAt.current[mood.id] = { x, width };
-                if (isOn) centreActiveMood(false);
-              }}
               style={({ pressed }) => [
                 styles.moodChip,
                 pressed && { transform: [{ scale: 0.94 }] },
@@ -220,7 +196,7 @@ export function HomeScreen({
               >
                 <Face
                   mood={mood.id}
-                  size={30}
+                  size={24}
                   color={isOn ? colors.ink : isSuggested ? mood.accent : colors.muted}
                 />
               </View>
@@ -243,24 +219,49 @@ export function HomeScreen({
             onDiscover();
           }}
           accessibilityRole="button"
-          accessibilityLabel="Anything — no mood on the deck"
+          accessibilityState={{ selected: state.mood === null }}
+          accessibilityLabel="Any — no mood on the deck"
         >
-          <View style={[styles.moodDisc, state.mood === null && { borderColor: colors.muted }]}>
-            <Text style={styles.moodAny}>∞</Text>
+          <View
+            style={[
+              styles.moodDisc,
+              state.mood === null && { backgroundColor: colors.text, borderColor: colors.text },
+            ]}
+          >
+            <Text style={[styles.moodAny, state.mood === null && { color: colors.ink }]}>∞</Text>
           </View>
-          <Text style={[styles.moodChipLabel, { color: colors.muted }]}>Anything</Text>
+          <Text
+            style={[styles.moodChipLabel, { color: state.mood === null ? colors.text : colors.muted }]}
+          >
+            Any
+          </Text>
         </Pressable>
-      </ScrollView>
+      </View>
       {state.prefs.moodByTime !== "off" ? (
         <Text style={styles.moodNudge}>{DAYPART_COPY[hour.part].nudge}</Text>
       ) : null}
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Your library</Text>
-        <Pressable onPress={onNewPlaylist} hitSlop={8}>
-          <Text style={[styles.sectionAction, { color: accent }]}>+ new playlist</Text>
-        </Pressable>
       </View>
+      {libraryEmpty ? (
+        // one invitation, not two empty boxes pretending to be a library
+        <Pressable
+          style={({ pressed }) => [styles.emptyLibrary, pressed && styles.pressed]}
+          onPress={onNewPlaylist}
+          accessibilityRole="button"
+        >
+          <View style={styles.emptyIcon}>
+            <Feather name="heart" size={17} color={colors.save} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+            <Text style={styles.emptySub}>
+              Swipe a song down to keep it. Tap here, or hold +, to start a playlist.
+            </Text>
+          </View>
+        </Pressable>
+      ) : (
       <View style={styles.tiles}>
         <Pressable
           style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
@@ -302,6 +303,7 @@ export function HomeScreen({
           </Pressable>
         ))}
       </View>
+      )}
 
       {becauseRows.map((row) => (
         <View key={row.genre} style={styles.becauseWrap}>
@@ -402,7 +404,7 @@ const styles = StyleSheet.create({
   ctaSub: {
     fontFamily: fonts.body,
     fontSize: 13,
-    color: "rgba(255,255,255,0.75)",
+    opacity: 0.72,
     marginTop: 4,
   },
   sectionHead: {
@@ -420,14 +422,13 @@ const styles = StyleSheet.create({
   },
   sectionCount: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
   sectionAction: { fontFamily: fonts.bodyBold, fontSize: 12.5 },
-  moodScroll: { marginHorizontal: -20 },
-  moodRow: { flexDirection: "row", gap: 6, paddingHorizontal: 20, paddingBottom: 2 },
+  moodRow: { flexDirection: "row", gap: 2, paddingBottom: 2 },
   // circles, matching the ring: the face on the card, on the ring and here are
   // the same round object at three sizes
-  moodChip: { width: 82, alignItems: "center", gap: 8, paddingTop: 2, paddingBottom: 4 },
+  moodChip: { flex: 1, minWidth: 0, alignItems: "center", gap: 7, paddingTop: 2, paddingBottom: 4 },
   moodDisc: {
-    width: 72,
-    height: 72,
+    width: 44,
+    height: 44,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -435,8 +436,30 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.surface,
   },
-  moodChipLabel: { fontFamily: fonts.bodyBold, fontSize: 11.5 },
-  moodAny: { fontFamily: fonts.body, fontSize: 24, lineHeight: 28, color: colors.muted },
+  moodChipLabel: { fontFamily: fonts.bodyBold, fontSize: 10.5 },
+  moodAny: { fontFamily: fonts.body, fontSize: 19, lineHeight: 22, color: colors.muted },
+  emptyLibrary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+    marginBottom: 28,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  emptyIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,229,160,0.12)",
+  },
+  emptyTitle: { fontFamily: fonts.bodyBold, fontSize: 14.5, color: colors.text, marginBottom: 3 },
+  emptySub: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, color: colors.muted },
   moodNudge: {
     fontFamily: fonts.bodySemiBold,
     fontSize: 12.5,

@@ -1,4 +1,4 @@
-﻿import { useEffect, type ReactNode } from "react";
+﻿import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
@@ -32,6 +32,23 @@ export function Toggle({ on }: { on: boolean }) {
   );
 }
 
+/**
+ * A card of rows with hairlines between them — settings reads as a few short
+ * groups instead of one long column of separate boxes (mirrors web's
+ * .settings-card).
+ */
+const InGroup = createContext(false);
+export function RowGroup({ children }: { children: ReactNode }) {
+  return (
+    <View style={styles.card}>
+      {/* the first row's top hairline is tucked under the card's edge */}
+      <View style={{ marginTop: -StyleSheet.hairlineWidth }}>
+        <InGroup.Provider value={true}>{children}</InGroup.Provider>
+      </View>
+    </View>
+  );
+}
+
 export function Row({
   icon,
   iconColor,
@@ -51,9 +68,10 @@ export function Row({
   chevron?: boolean;
   onPress: () => void;
 }) {
+  const grouped = useContext(InGroup);
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [styles.row, grouped && styles.rowGrouped, pressed && { opacity: 0.8 }]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={sub ? `${label}. ${sub}` : label}
@@ -135,6 +153,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     marginBottom: 8,
+  },
+  rowGrouped: {
+    marginBottom: 0,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: "transparent",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  card: {
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    overflow: "hidden",
+    marginBottom: 4,
   },
   rowIcon: { width: 24, alignItems: "center" },
   rowLabelWrap: { flex: 1, minWidth: 0, gap: 2 },
