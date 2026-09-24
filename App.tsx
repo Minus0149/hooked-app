@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -40,9 +41,13 @@ import {
   coerceMood,
   DAYPART_MOOD,
   daypartAt,
+  moodAtPush,
+  moodById,
+  moodPlaylistName,
   type CrowdMoods,
   type MoodId,
 } from "./src/data/mood";
+import { MoodWheel } from "./src/components/MoodWheel";
 import { verdict as verdictFor } from "./src/data/predict";
 import { coercePrefs, type UserPrefs } from "./src/data/prefs";
 import { authClient } from "./src/lib/auth-client";
@@ -1018,6 +1023,47 @@ function Shell() {
     [signedIn, createPlaylistMutation, createPlaylist],
   );
 
+  /**
+   * Hold the +, push toward a face, release: that mood's playlist is created
+   * (or found), made the swipe-down target and the deck's lens — so every song
+   * kept fills it. Same behaviour as the web app.
+   */
+  const screenSize = useWindowDimensions();
+  const [plusRing, setPlusRing] = useState<{ x: number; y: number } | null>(null);
+  const [plusAim, setPlusAim] = useState<MoodId | null>(null);
+  const [plusHolding, setPlusHolding] = useState(false);
+  const closePlusRing = useCallback(() => {
+    setPlusRing(null);
+    setPlusAim(null);
+    setPlusHolding(false);
+  }, []);
+  const makeMoodPlaylist = useCallback(
+    async (mood: MoodId) => {
+      const face = moodById(mood);
+      if (!face) return;
+      const name = moodPlaylistName(mood);
+      const existing = state.playlists.find(
+        (p) => p.name.trim().toLowerCase() === name.toLowerCase(),
+      );
+      const id = existing ? existing.id : await handleCreatePlaylist(name, face.accent);
+      handleSaveTarget(`pl:${id}`);
+      setMood(mood);
+      switchTab("discover");
+    },
+    [state.playlists, handleCreatePlaylist, handleSaveTarget, setMood, switchTab],
+  );
+  // release commits what the finger pointed at; a release in the dead zone
+  // leaves the ring up to be tapped, like the card ring
+  const plusWasHolding = useRef(false);
+  useEffect(() => {
+    if (plusWasHolding.current && !plusHolding && plusAim) {
+      const mood = plusAim;
+      closePlusRing();
+      void makeMoodPlaylist(mood);
+    }
+    plusWasHolding.current = plusHolding;
+  }, [plusHolding, plusAim, closePlusRing, makeMoodPlaylist]);
+
   /** FAB flow: create the playlist AND make it the swipe-down destination. */
   const handleCreateAndTarget = useCallback(
     async (name: string, accent: string) => {
@@ -1399,7 +1445,35 @@ function Shell() {
         showCreate={screen === "home"}
         onChange={(v) => switchTab(v)}
         onCreate={() => setNewPlaylistOpen(true)}
+        onHoldStart={(x, y) => {
+          setPlusAim(null);
+          setPlusHolding(true);
+          setPlusRing({ x, y });
+        }}
+        onHoldMove={(dx, dy) => setPlusAim(moodAtPush(dx, dy, 38))}
+        onHoldEnd={() => setPlusHolding(false)}
       />
+
+      {plusRing && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <MoodWheel
+            origin={plusRing}
+            host={{ x: 0, y: 0, width: screenSize.width, height: screenSize.height }}
+            aim={plusAim}
+            picked={null}
+            active={state.mood}
+            verdict={null}
+            dragging={plusHolding}
+            motionPref={state.prefs.motion}
+            hint="pick a mood — a playlist that fills as you keep songs"
+            onCommit={(mood) => {
+              closePlusRing();
+              void makeMoodPlaylist(mood);
+            }}
+            onCancel={closePlusRing}
+          />
+        </View>
+      )}
 
       {/* over-the-air update: slides in when a bundle has downloaded */}
       <UpdateBanner />

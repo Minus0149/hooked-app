@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Svg, { Path } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
 import { colors, fonts, withAlpha } from "../design/tokens";
@@ -79,13 +81,52 @@ export function BottomNav({
   showCreate,
   onChange,
   onCreate,
+  onHoldStart,
+  onHoldMove,
+  onHoldEnd,
 }: {
   view: NavView;
   accent: string;
   showCreate: boolean; // the + (and its notch) only live on the home screen
   onChange: (v: NavView) => void;
   onCreate: () => void;
+  /** held instead of tapped: open the mood ring around the + (window coords) */
+  onHoldStart?: (x: number, y: number) => void;
+  /** the same finger pushing, relative to where it pressed */
+  onHoldMove?: (dx: number, dy: number) => void;
+  onHoldEnd?: () => void;
 }) {
+  // Tap makes a playlist; a hold opens the faces and the same finger aims.
+  // Exclusive: the tap only fires if the hold never activated, so a hold's
+  // release can't also open the new-playlist sheet.
+  const pressed = useSharedValue(0);
+  const noop = () => {};
+  const holdGesture = Gesture.Pan()
+    .enabled(!!onHoldStart)
+    .activateAfterLongPress(420)
+    .onStart((e) => {
+      runOnJS(onHoldStart ?? noop)(e.absoluteX, e.absoluteY);
+    })
+    .onUpdate((e) => {
+      runOnJS(onHoldMove ?? noop)(e.translationX, e.translationY);
+    })
+    .onEnd(() => {
+      runOnJS(onHoldEnd ?? noop)();
+    });
+  const tapGesture = Gesture.Tap()
+    .onBegin(() => {
+      pressed.value = withSpring(1, { stiffness: 600, damping: 30 });
+    })
+    .onFinalize(() => {
+      pressed.value = withSpring(0, { stiffness: 600, damping: 30 });
+    })
+    .onEnd(() => {
+      runOnJS(onCreate)();
+    });
+  const fabGesture = Gesture.Exclusive(holdGesture, tapGesture);
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - pressed.value * 0.1 }],
+  }));
   const v = useSharedValue(showCreate ? 1 : 0);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
@@ -143,16 +184,17 @@ export function BottomNav({
           pointerEvents={showCreate ? "box-none" : "none"}
           style={[styles.fabHost, fabStyle]}
         >
-          <Pressable
-            style={({ pressed }) => [
-              styles.fab,
-              { backgroundColor: accent },
-              pressed && { transform: [{ scale: 0.9 }] },
-            ]}
-            onPress={onCreate}
-          >
-            <Feather name="plus" size={26} color={colors.ink} />
-          </Pressable>
+          <GestureDetector gesture={fabGesture}>
+            <Animated.View
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Create a playlist"
+              accessibilityHint="Hold to pick a mood for a playlist"
+              style={[styles.fab, { backgroundColor: accent }, pressStyle]}
+            >
+              <Feather name="plus" size={26} color={colors.ink} />
+            </Animated.View>
+          </GestureDetector>
         </Animated.View>
       </View>
     </View>

@@ -12,6 +12,7 @@ import { MOODS, wheelAngle, type Mood, type MoodId } from "../data/mood";
 import type { Verdict } from "../data/predict";
 import { colors, fonts, withAlpha } from "../design/tokens";
 import { Face } from "./faces";
+import { useFaceIdle } from "./faceMotion";
 
 /**
  * The mood ring — the mobile half of web/src/components/MoodWheel.tsx.
@@ -31,6 +32,8 @@ import { Face } from "./faces";
 export const RING = 92;
 const BUBBLE = 54;
 const EDGE = 8;
+/** height of the hint strip at the bottom, which the ring must not cover */
+const HINT_ROOM = 44;
 
 export interface HostRect {
   x: number;
@@ -45,6 +48,7 @@ function RingFace({
   aimed,
   picked,
   lens,
+  lively,
   onPress,
 }: {
   mood: Mood;
@@ -52,8 +56,11 @@ function RingFace({
   aimed: boolean;
   picked: boolean;
   lens: boolean;
+  /** play the face's idle loop (the in-app motion setting is "full") */
+  lively: boolean;
   onPress: () => void;
 }) {
+  const idleStyle = useFaceIdle(mood.id, index, aimed, lively);
   const a = (wheelAngle(index) * Math.PI) / 180;
   const tx = Math.cos(a) * RING;
   const ty = Math.sin(a) * RING;
@@ -95,7 +102,10 @@ function RingFace({
           },
         ]}
       >
-        <Face mood={mood.id} size={30} color={aimed ? colors.ink : mood.accent} />
+        {/* its own view, so the idle loop never fights the orbit spring */}
+        <Animated.View style={idleStyle}>
+          <Face mood={mood.id} size={30} color={aimed ? colors.ink : mood.accent} />
+        </Animated.View>
       </Pressable>
     </Animated.View>
   );
@@ -111,6 +121,8 @@ export function MoodWheel({
   dragging,
   onCommit,
   onCancel,
+  motionPref = "full",
+  hint,
 }: {
   /** window coordinates of the press that opened it */
   origin: { x: number; y: number };
@@ -124,12 +136,17 @@ export function MoodWheel({
   dragging: boolean;
   onCommit: (mood: MoodId) => void;
   onCancel: () => void;
+  motionPref?: "full" | "reduced" | "off";
+  /** the line under everything; defaults to the card's "how does this one feel?" */
+  hint?: string;
 }) {
   const reach = RING + BUBBLE / 2 + EDGE;
   const fx = origin.x - host.x;
   const fy = origin.y - host.y;
   const cx = Math.min(Math.max(fx, reach), host.width - reach);
-  const cy = Math.min(Math.max(fy, reach + 40), host.height - reach);
+  // kept clear of the hint strip: a ring opened low (the +, or a card's lower
+  // edge) would otherwise put its bottom face on top of the hint text
+  const cy = Math.min(Math.max(fy, reach + 40), host.height - reach - HINT_ROOM);
 
   const aimIndex = aim ? MOODS.findIndex((m) => m.id === aim) : -1;
   const lead = aimIndex >= 0 ? MOODS[aimIndex] : null;
@@ -162,6 +179,7 @@ export function MoodWheel({
             aimed={aimIndex === i}
             picked={picked === m.id}
             lens={active === m.id}
+            lively={motionPref === "full"}
             onPress={() => onCommit(m.id)}
           />
         ))}
@@ -193,7 +211,7 @@ export function MoodWheel({
             ? `${Math.round(verdict.chance * 100)}% your kind of thing${
                 verdict.reasons.length ? ` · ${verdict.reasons.join(", ")}` : ""
               }`
-            : "how does this one feel?"}
+            : (hint ?? "how does this one feel?")}
         </Text>
       </View>
     </>
