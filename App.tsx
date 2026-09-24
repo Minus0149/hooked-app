@@ -125,6 +125,10 @@ interface ServerLibrary {
     id: string;
     name: string;
     accent: string;
+    allowRepeats?: boolean;
+    includeBuried?: boolean;
+    includeBlockedArtists?: boolean;
+    mood?: string | null;
     songs: ServerTrack[];
   }[];
   neverArtists: string[];
@@ -647,6 +651,12 @@ function Shell() {
           id: String(p.id),
           name: p.name,
           accent: p.accent,
+          // the playlist's own rules and mood; dropping them here reset every
+          // playlist's rules to off on the phone after each sign-in
+          allowRepeats: p.allowRepeats,
+          includeBuried: p.includeBuried,
+          includeBlockedArtists: p.includeBlockedArtists,
+          mood: coerceMood(p.mood) ?? undefined,
           tracks: p.songs.map(toLocal),
         })),
         neverArtists: library.neverArtists,
@@ -1029,16 +1039,19 @@ function Shell() {
         includeBuried?: boolean;
         includeBlockedArtists?: boolean;
       },
+      mood?: MoodId | null,
     ): Promise<string> => {
       let id = `local-${Date.now()}`;
       if (signedIn) {
         try {
-          id = String(await createPlaylistMutation({ name, accent, ...rules }));
+          id = String(
+            await createPlaylistMutation({ name, accent, ...rules, ...(mood ? { mood } : {}) }),
+          );
         } catch {
           /* keep local id */
         }
       }
-      createPlaylist({ id, name, accent, tracks: [], ...rules });
+      createPlaylist({ id, name, accent, tracks: [], ...rules, ...(mood ? { mood } : {}) });
       return id;
     },
     [signedIn, createPlaylistMutation, createPlaylist],
@@ -1066,7 +1079,7 @@ function Shell() {
       const existing = state.playlists.find(
         (p) => p.name.trim().toLowerCase() === name.toLowerCase(),
       );
-      const id = existing ? existing.id : await handleCreatePlaylist(name, face.accent);
+      const id = existing ? existing.id : await handleCreatePlaylist(name, face.accent, undefined, mood);
       handleSaveTarget(`pl:${id}`);
       setMood(mood);
       switchTab("discover");
@@ -1087,20 +1100,36 @@ function Shell() {
 
   /** FAB flow: create the playlist AND make it the swipe-down destination. */
   const handleCreateAndTarget = useCallback(
-    async (name: string, accent: string) => {
-      const id = await handleCreatePlaylist(name, accent);
+    async (
+      name: string,
+      accent: string,
+      rules?: { allowRepeats?: boolean; includeBuried?: boolean; includeBlockedArtists?: boolean },
+      mood?: MoodId | null,
+    ) => {
+      const id = await handleCreatePlaylist(name, accent, rules, mood);
       handleSaveTarget(`pl:${id}`);
+      if (mood) {
+        // made for a mood: the lens goes on and the deck opens, the same as
+        // holding the + for it
+        setMood(mood);
+        switchTab("discover");
+      }
     },
-    [handleCreatePlaylist, handleSaveTarget],
+    [handleCreatePlaylist, handleSaveTarget, setMood, switchTab],
   );
 
   /** "Discover into this": point saves at the container, then go swipe. */
   const handleDiscoverInto = useCallback(
     (container: LibraryContainer) => {
       handleSaveTarget(container as SaveTarget);
+      // a mood playlist brings its lens with it, so what fills it still fits
+      const pl = container.startsWith("pl:")
+        ? state.playlists.find((p) => p.id === container.slice(3))
+        : undefined;
+      if (pl?.mood) setMood(pl.mood);
       switchTab("discover");
     },
-    [handleSaveTarget, switchTab],
+    [handleSaveTarget, switchTab, state.playlists, setMood],
   );
 
   const handleDeletePlaylist = useCallback(
@@ -1512,7 +1541,7 @@ function Shell() {
 
       {newPlaylistOpen && (
         <NewPlaylistSheet
-          onCreate={(name, swatch) => void handleCreateAndTarget(name, swatch)}
+          onCreate={(name, swatch, rules, mood) => void handleCreateAndTarget(name, swatch, rules, mood)}
           onClose={() => setNewPlaylistOpen(false)}
         />
       )}

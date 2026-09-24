@@ -1,4 +1,5 @@
-﻿/**
+﻿import type { MoodId } from "./data/mood";
+/**
  * A window into a track's audio. A 30-second preview holds three of them; a
  * full upload holds as many as the artist marks.
  */
@@ -63,6 +64,8 @@ export interface Playlist {
   allowRepeats?: boolean;
   includeBuried?: boolean;
   includeBlockedArtists?: boolean;
+  /** the mood it was made for — discovering into it puts that lens back on */
+  mood?: MoodId;
 }
 
 export type LibraryContainer = "liked" | "discoveries" | `pl:${string}`;

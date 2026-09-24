@@ -8,7 +8,8 @@ import Animated, {
   withDelay,
   withSpring,
 } from "react-native-reanimated";
-import { MOODS, wheelAngle, type Mood, type MoodId } from "../data/mood";
+import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
+import { MOODS, wedgePath, wedgePoint, type Mood, type MoodId } from "../data/mood";
 import type { Verdict } from "../data/predict";
 import { colors, fonts, withAlpha } from "../design/tokens";
 import { Face } from "./faces";
@@ -17,23 +18,36 @@ import { useFaceIdle } from "./faceMotion";
 /**
  * The mood ring — the mobile half of web/src/components/MoodWheel.tsx.
  *
- * Six faces orbiting the thumb that summoned them. A big wheel had nowhere to
- * go but the middle of the screen, which made the eye travel away from the
- * finger that was already holding the card. This ring is small, centred on
- * the fingertip, and the faces fly out FROM the finger — which is what tells
- * you where the centre is without drawing anything there, since the thumb
- * covers the centre anyway.
+ * A wheel of six wedges around the thumb that summoned it, like a game's
+ * emote wheel. The push rule already gives every face a full 60 degrees, so
+ * the wheel draws exactly that: what you see is what the finger can hit. The
+ * hole in the middle is where the thumb is — coming back into it and letting
+ * go cancels. The aimed wedge fills with its colour and steps out, and its
+ * name floats above the ring, where a hand can't cover it.
  *
- * The aimed face's name floats above the ring, where a hand can't cover it.
  * Directions are fixed (and mirrored with web in data/mood.ts), so the ring
  * only ever nudges inward near an edge; it never rearranges.
  */
 
-export const RING = 92;
-const BUBBLE = 54;
-const EDGE = 8;
+/** outer edge of the wheel */
+export const R_OUT = 116;
+/** the hole — where the thumb sits */
+const R_IN = 46;
+/** where each face and its name sit along the wedge */
+const FACE_R = 80;
+/** face a little above that point, name a little below: stacked, not radial */
+const FACE_DY = -8;
+const NAME_DY = 16;
+/** trim on each side of a wedge, degrees — the dark seams between keys */
+const GAP = 1.1;
+/** how far the aimed wedge steps out */
+const POP = 6;
+const EDGE = 6;
 /** height of the hint strip at the bottom, which the ring must not cover */
 const HINT_ROOM = 44;
+/** the svg canvas: the wheel plus room for the popped wedge */
+const CANVAS = (R_OUT + POP + 14) * 2;
+const FACE_BOX = 44;
 
 export interface HostRect {
   x: number;
@@ -47,7 +61,6 @@ function RingFace({
   index,
   aimed,
   picked,
-  lens,
   lively,
   onPress,
 }: {
@@ -55,34 +68,36 @@ function RingFace({
   index: number;
   aimed: boolean;
   picked: boolean;
-  lens: boolean;
   /** play the face's idle loop (the in-app motion setting is "full") */
   lively: boolean;
   onPress: () => void;
 }) {
   const idleStyle = useFaceIdle(mood.id, index, aimed, lively);
-  const a = (wheelAngle(index) * Math.PI) / 180;
-  const tx = Math.cos(a) * RING;
-  const ty = Math.sin(a) * RING;
+  const rest = wedgePoint(index, FACE_R);
+  const popped = wedgePoint(index, FACE_R + POP);
 
-  // out of the fingertip and into orbit
+  // out of the fingertip and into the wheel
   const out = useSharedValue(0);
-  const grow = useSharedValue(1);
+  const push = useSharedValue(0);
   useEffect(() => {
-    out.value = withDelay(index * 22, withSpring(1, { stiffness: 560, damping: 30 }));
+    out.value = withDelay(30 + index * 20, withSpring(1, { stiffness: 560, damping: 30 }));
   }, [index, out]);
   useEffect(() => {
-    grow.value = withSpring(aimed ? 1.2 : 1, { stiffness: 520, damping: 24 });
-  }, [aimed, grow]);
+    push.value = withSpring(aimed ? 1 : 0, { stiffness: 520, damping: 24 });
+  }, [aimed, push]);
 
-  const style = useAnimatedStyle(() => ({
-    opacity: out.value,
-    transform: [
-      { translateX: tx * out.value - BUBBLE / 2 },
-      { translateY: ty * out.value - BUBBLE / 2 },
-      { scale: (0.3 + 0.7 * out.value) * grow.value },
-    ],
-  }));
+  const style = useAnimatedStyle(() => {
+    const x = rest.x + (popped.x - rest.x) * push.value;
+    const y = rest.y + (popped.y - rest.y) * push.value + FACE_DY;
+    return {
+      opacity: out.value,
+      transform: [
+        { translateX: x * out.value - FACE_BOX / 2 },
+        { translateY: y * out.value - FACE_BOX / 2 },
+        { scale: (0.3 + 0.7 * out.value) * (1 + 0.18 * push.value) },
+      ],
+    };
+  });
 
   return (
     <Animated.View style={[styles.faceSlot, style]}>
@@ -91,22 +106,96 @@ function RingFace({
         accessibilityRole="button"
         accessibilityLabel={`${mood.label} — ${mood.line}`}
         accessibilityState={{ selected: picked }}
-        style={[
-          styles.bubble,
-          { borderColor: picked || lens ? mood.accent : withAlpha(mood.accent, 0.42) },
-          (picked || lens) && { borderWidth: 2 },
-          aimed && {
-            backgroundColor: mood.accent,
-            borderColor: mood.accent,
-            shadowColor: mood.accent,
-          },
-        ]}
+        style={styles.faceHit}
       >
-        {/* its own view, so the idle loop never fights the orbit spring */}
+        {/* its own view, so the idle loop never fights the spring */}
         <Animated.View style={idleStyle}>
-          <Face mood={mood.id} size={30} color={aimed ? colors.ink : mood.accent} />
+          <Face mood={mood.id} size={28} color={aimed ? colors.ink : mood.accent} />
         </Animated.View>
       </Pressable>
+    </Animated.View>
+  );
+}
+
+/** The wheel itself: six wedges, the rim, the hole and the aim pointer. */
+function Wheel({
+  aimIndex,
+  picked,
+  active,
+  cancelling,
+  onPress,
+}: {
+  aimIndex: number;
+  picked: MoodId | null;
+  active: MoodId | null;
+  cancelling: boolean;
+  onPress: (mood: MoodId) => void;
+}) {
+  const grow = useSharedValue(0);
+  useEffect(() => {
+    grow.value = withSpring(1, { stiffness: 460, damping: 30 });
+  }, [grow]);
+  const style = useAnimatedStyle(() => ({
+    opacity: Math.min(1, grow.value * 1.4),
+    transform: [{ scale: 0.5 + 0.5 * grow.value }, { rotate: `${-24 * (1 - grow.value)}deg` }],
+  }));
+  const h = CANVAS / 2;
+
+  return (
+    <Animated.View style={[styles.wheel, style]}>
+      <Svg width={CANVAS} height={CANVAS} viewBox={`${-h} ${-h} ${CANVAS} ${CANVAS}`}>
+        <Circle r={R_OUT + 3} fill="none" stroke={withAlpha(colors.text, 0.1)} strokeWidth={1} />
+        {MOODS.map((m, i) => {
+          const on = aimIndex === i;
+          const off = wedgePoint(i, on ? POP : 0);
+          const name = wedgePoint(i, FACE_R);
+          const dot = wedgePoint(i, R_OUT - 9);
+          return (
+            <G key={m.id} x={off.x} y={off.y} onPress={() => onPress(m.id)}>
+              <Path
+                d={wedgePath(i, R_IN, R_OUT, GAP)}
+                fill={on ? m.accent : "rgba(16,16,23,0.92)"}
+                stroke={on ? m.accent : active === m.id ? withAlpha(m.accent, 0.7) : withAlpha(colors.text, 0.08)}
+                strokeWidth={active === m.id && !on ? 1.5 : 1}
+              />
+              {picked === m.id && (
+                // what you already said about this song: a dot on the rim
+                <Circle cx={dot.x} cy={dot.y} r={3.5} fill={on ? colors.ink : m.accent} />
+              )}
+              <SvgText
+                x={name.x}
+                y={name.y + NAME_DY + 3}
+                textAnchor="middle"
+                fontFamily={fonts.bodyBold}
+                fontSize={9}
+                letterSpacing={0.9}
+                fill={on ? "rgba(11,11,16,0.78)" : withAlpha(colors.text, 0.5)}
+              >
+                {m.label.toUpperCase()}
+              </SvgText>
+            </G>
+          );
+        })}
+        <Circle
+          r={R_IN - 6}
+          fill="none"
+          stroke={withAlpha(colors.text, 0.12)}
+          strokeWidth={1}
+          strokeDasharray="2 4"
+        />
+        {aimIndex >= 0 && (
+          <Path d={wedgePath(aimIndex, R_IN - 7.5, R_IN - 4.5, 8)} fill={MOODS[aimIndex].accent} />
+        )}
+        {cancelling && (
+          // back in the middle: this is where letting go cancels
+          <Path
+            d="M -7 -7 L 7 7 M 7 -7 L -7 7"
+            stroke={withAlpha(colors.text, 0.7)}
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        )}
+      </Svg>
     </Animated.View>
   );
 }
@@ -140,7 +229,7 @@ export function MoodWheel({
   /** the line under everything; defaults to the card's "how does this one feel?" */
   hint?: string;
 }) {
-  const reach = RING + BUBBLE / 2 + EDGE;
+  const reach = R_OUT + POP + EDGE;
   const fx = origin.x - host.x;
   const fy = origin.y - host.y;
   const cx = Math.min(Math.max(fx, reach), host.width - reach);
@@ -161,7 +250,7 @@ export function MoodWheel({
 
   const aimIndex = aim ? MOODS.findIndex((m) => m.id === aim) : -1;
   const lead = aimIndex >= 0 ? MOODS[aimIndex] : null;
-  const labelBelow = cy - RING - BUBBLE / 2 - 58 < 0;
+  const labelBelow = cy - R_OUT - 64 < 0;
 
   return (
     <>
@@ -174,13 +263,12 @@ export function MoodWheel({
       </Animated.View>
 
       <View pointerEvents="box-none" style={[styles.ring, { left: cx, top: cy }]}>
-        <Animated.View
-          entering={FadeIn.duration(180)}
-          pointerEvents="none"
-          style={[
-            styles.track,
-            { width: RING * 2, height: RING * 2, left: -RING, top: -RING },
-          ]}
+        <Wheel
+          aimIndex={aimIndex}
+          picked={picked}
+          active={active}
+          cancelling={dragging && !aim && everAimed.current}
+          onPress={onCommit}
         />
         {MOODS.map((m, i) => (
           <RingFace
@@ -189,7 +277,6 @@ export function MoodWheel({
             index={i}
             aimed={aimIndex === i}
             picked={picked === m.id}
-            lens={active === m.id}
             lively={motionPref === "full"}
             onPress={() => onCommit(m.id)}
           />
@@ -200,7 +287,7 @@ export function MoodWheel({
             styles.label,
             // anchored by the edge nearest the ring, so a two-line label grows
             // away from the faces instead of into the top one
-            labelBelow ? { top: RING + BUBBLE / 2 + 12 } : { bottom: RING + BUBBLE / 2 + 12 },
+            labelBelow ? { top: R_OUT + 16 } : { bottom: R_OUT + 16 },
           ]}
         >
           {lead ? (
@@ -250,26 +337,15 @@ const styles = StyleSheet.create({
   },
   // a point, not a box: everything is laid out around (0,0), the finger
   ring: { position: "absolute", width: 0, height: 0, zIndex: 31 },
-  track: {
+  wheel: {
     position: "absolute",
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: withAlpha(colors.text, 0.16),
+    left: -CANVAS / 2,
+    top: -CANVAS / 2,
+    width: CANVAS,
+    height: CANVAS,
   },
-  faceSlot: { position: "absolute", left: 0, top: 0, width: BUBBLE, height: BUBBLE },
-  bubble: {
-    width: BUBBLE,
-    height: BUBBLE,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(11,11,16,0.92)",
-    borderWidth: 1.5,
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
+  faceSlot: { position: "absolute", left: 0, top: 0, width: FACE_BOX, height: FACE_BOX },
+  faceHit: { width: FACE_BOX, height: FACE_BOX, alignItems: "center", justifyContent: "center" },
   label: {
     position: "absolute",
     left: -130,

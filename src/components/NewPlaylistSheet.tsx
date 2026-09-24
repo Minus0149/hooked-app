@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { colors, fonts, PLAYLIST_SWATCHES } from "../design/tokens";
+import { Feather } from "@expo/vector-icons";
+import { colors, fonts, PLAYLIST_SWATCHES, withAlpha } from "../design/tokens";
+import { MOODS, moodById, type MoodId } from "../data/mood";
+import { nameAfterMoodPick } from "../lib/playlistMood";
+import { Face } from "./faces";
 import { Sheet, sheetText } from "./Sheet";
 
 /**
- * FAB flow — name a playlist, pick its accent, set its discovery rules, and
- * start saving into it. Mirrors web's NewPlaylistSheet.
+ * FAB flow — pick a mood (or Any), name the playlist, pick its accent, and
+ * start saving into it; the discovery rules fold away under "more options".
+ * A mood fills in the name and colour and puts that lens on the deck.
+ * Mirrors web's NewPlaylistSheet.
  */
 
-interface PlaylistRules {
+export interface PlaylistRules {
   allowRepeats?: boolean;
   includeBuried?: boolean;
   includeBlockedArtists?: boolean;
@@ -28,12 +34,30 @@ export function NewPlaylistSheet({
   onCreate,
   onClose,
 }: {
-  onCreate: (name: string, accent: string, rules?: PlaylistRules) => void;
+  onCreate: (name: string, accent: string, rules?: PlaylistRules, mood?: MoodId | null) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [accent, setAccent] = useState(PLAYLIST_SWATCHES[1]);
   const [rules, setRules] = useState<PlaylistRules>({});
+  const [mood, setMood] = useState<MoodId | null>(null);
+  const [more, setMore] = useState(false);
+  // the name a mood filled in, which the next mood may replace
+  const autoName = useRef("");
+  const pickMood = (next: MoodId | null) => {
+    setMood(next);
+    const face = next ? moodById(next) : null;
+    if (face) setAccent(face.accent);
+    const after = nameAfterMoodPick(name, autoName.current, next);
+    autoName.current = after.filled;
+    setName(after.name);
+  };
+  const activeRules = Object.values(rules).filter(Boolean).length;
+  const moodAccent = mood ? moodById(mood)?.accent : undefined;
+  const swatches =
+    moodAccent && !PLAYLIST_SWATCHES.includes(moodAccent)
+      ? [moodAccent, ...PLAYLIST_SWATCHES]
+      : PLAYLIST_SWATCHES;
 
   return (
     <Sheet onClose={onClose}>
@@ -41,16 +65,55 @@ export function NewPlaylistSheet({
         const create = () => {
           const trimmed = name.trim();
           if (!trimmed) return;
-          onCreate(trimmed, accent, rules);
+          onCreate(trimmed, accent, rules, mood);
           close();
         };
         return (
           <View>
             <Text style={sheetText.title}>New playlist</Text>
             <Text style={sheetText.sub}>
-              Every song you swipe down will be saved here until you change it in
-              settings.
+              {mood
+                ? `Swipe down to save here. The deck leans ${moodById(mood)?.label.toLowerCase()} while you fill it.`
+                : "Every song you swipe down is saved here until you pick another."}
             </Text>
+
+            <Text style={styles.rulesLabel}>mood</Text>
+            <View style={styles.moods} accessibilityRole="radiogroup">
+              {[null, ...MOODS.map((m) => m.id)].map((id) => {
+                const m = id ? moodById(id) : null;
+                const on = mood === id;
+                const tint = m ? m.accent : colors.text;
+                return (
+                  <Pressable
+                    key={id ?? "any"}
+                    style={styles.mood}
+                    onPress={() => pickMood(id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={m ? `${m.label} — ${m.line}` : "Any mood"}
+                  >
+                    <View
+                      style={[
+                        styles.moodFace,
+                        { borderColor: withAlpha(tint, 0.3) },
+                        on && { backgroundColor: tint, borderColor: tint },
+                      ]}
+                    >
+                      {id ? (
+                        <Face mood={id} size={21} color={on ? colors.ink : tint} />
+                      ) : (
+                        <Text style={[styles.any, on && { color: colors.ink }]}>∞</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.moodName, on && { color: colors.text }]} numberOfLines={1}>
+                      {m ? m.label : "Any"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.rulesLabel}>name</Text>
             <TextInput
               style={styles.input}
               autoFocus
@@ -58,12 +121,15 @@ export function NewPlaylistSheet({
               placeholderTextColor={colors.muted}
               value={name}
               maxLength={40}
-              onChangeText={setName}
+              onChangeText={(t) => {
+                autoName.current = "";
+                setName(t);
+              }}
               onSubmitEditing={create}
               returnKeyType="done"
             />
             <View style={styles.swatches}>
-              {PLAYLIST_SWATCHES.map((c) => (
+              {swatches.map((c) => (
                 <Pressable
                   key={c}
                   style={[
@@ -76,8 +142,17 @@ export function NewPlaylistSheet({
               ))}
             </View>
 
-            <Text style={styles.rulesLabel}>discovery rules</Text>
-            {RULE_ROWS.map(({ key, label, sub }) => (
+            <Pressable
+              style={styles.more}
+              onPress={() => setMore((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: more }}
+            >
+              <Text style={styles.moreText}>{more ? "fewer options" : "more options"}</Text>
+              {!more && activeRules > 0 && <Text style={styles.moreCount}>{activeRules} on</Text>}
+              <Feather name={more ? "chevron-up" : "chevron-down"} size={14} color={colors.muted} />
+            </Pressable>
+            {more && RULE_ROWS.map(({ key, label, sub }) => (
               <Pressable
                 key={key}
                 style={styles.ruleRow}
@@ -105,7 +180,9 @@ export function NewPlaylistSheet({
               disabled={!name.trim()}
               onPress={create}
             >
-              <Text style={styles.primaryText}>Create &amp; start saving here</Text>
+              <Text style={styles.primaryText}>
+                {mood ? "Create & start discovering" : "Create & start saving here"}
+              </Text>
             </Pressable>
           </View>
         );
@@ -143,6 +220,31 @@ const styles = StyleSheet.create({
   swatchOn: {
     borderColor: colors.text,
     transform: [{ scale: 1.15 }],
+  },
+  moods: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  mood: { alignItems: "center", gap: 5, flex: 1 },
+  moodFace: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  any: { fontSize: 17, color: colors.muted },
+  moodName: { fontFamily: fonts.bodySemiBold, fontSize: 10.5, color: colors.muted },
+  more: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6, marginBottom: 6 },
+  moreText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
+  moreCount: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.text,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   rulesLabel: {
     fontFamily: fonts.bodyBold,

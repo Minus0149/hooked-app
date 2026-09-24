@@ -17,6 +17,7 @@ import type { LibraryContainer, Track } from "../types";
 import { colors, fonts, mixHex, radii, withAlpha } from "../design/tokens";
 import { art } from "../lib/art";
 import { useDialogs } from "./Dialogs";
+import { moodById } from "../data/mood";
 
 function totalMinutes(tracks: Track[]) {
   // previews are ~30s each; show the full-song runtime for flavor
@@ -190,7 +191,12 @@ export function LibraryScreen({
         <View style={styles.heroMeta}>
           <Text style={[styles.kicker, { color: accent }]} numberOfLines={1}>
             <Feather name={icon} size={10.5} color={accent} />{" "}
-            {playlistId ? "PLAYLIST" : "COLLECTION"}
+            {playlistId
+              ? (() => {
+                  const m = moodById(state.playlists.find((p) => p.id === playlistId)?.mood);
+                  return m ? `${m.label.toUpperCase()} PLAYLIST` : "PLAYLIST";
+                })()
+              : "COLLECTION"}
             {isSaveTarget && (
               <Text style={{ color: colors.save }}> · saving here</Text>
             )}
