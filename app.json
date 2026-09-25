@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Hooked",
+    "name": "hookedcue",
     "slug": "hooked-music",
     "scheme": "hooked",
     "version": "1.0.2",
@@ -19,7 +19,7 @@
       "checkAutomatically": "ON_LOAD"
     },
     "ios": {
-      "bundleIdentifier": "com.minus.hooked",
+      "bundleIdentifier": "com.minus.hookedcue",
       "buildNumber": "1.0.2",
       "supportsTablet": true,
       "infoPlist": {
@@ -27,7 +27,7 @@
       }
     },
     "android": {
-      "package": "com.minus.hooked",
+      "package": "com.minus.hookedcue",
       "versionCode": 3,
       "usesCleartextTraffic": false,
       "adaptiveIcon": {
