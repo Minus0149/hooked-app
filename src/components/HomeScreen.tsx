@@ -196,7 +196,9 @@ export function HomeScreen({
               >
                 <Face
                   mood={mood.id}
-                  size={24}
+                  size={26}
+                  cut={isOn ? mood.accent : colors.surface}
+                  animated={isOn && state.prefs.motion === "full"}
                   color={isOn ? colors.ink : isSuggested ? mood.accent : colors.muted}
                 />
               </View>

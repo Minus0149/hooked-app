@@ -100,7 +100,7 @@ export function NewPlaylistSheet({
                       ]}
                     >
                       {id ? (
-                        <Face mood={id} size={21} color={on ? colors.ink : tint} />
+                        <Face mood={id} size={24} color={on ? colors.ink : tint} cut={on ? tint : colors.surface2} animated={on} />
                       ) : (
                         <Text style={[styles.any, on && { color: colors.ink }]}>∞</Text>
                       )}

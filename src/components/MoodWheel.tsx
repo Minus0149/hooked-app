@@ -110,7 +110,14 @@ function RingFace({
       >
         {/* its own view, so the idle loop never fights the spring */}
         <Animated.View style={idleStyle}>
-          <Face mood={mood.id} size={28} color={aimed ? colors.ink : mood.accent} />
+          <Face
+            mood={mood.id}
+            size={30}
+            color={aimed ? colors.ink : mood.accent}
+            cut={aimed ? mood.accent : "#101017"}
+            animated={lively}
+            delay={index * 0.13}
+          />
         </Animated.View>
       </Pressable>
     </Animated.View>
