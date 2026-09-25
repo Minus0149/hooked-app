@@ -10,7 +10,7 @@
 $ErrorActionPreference = "Stop"
 $log = { param($m) Write-Output ("[{0}] {1}" -f (Get-Date -Format HH:mm:ss), $m) }
 
-$root = "C:\Users\minus\hooked"
+$root = (Resolve-Path "$PSScriptRoot\..\..").Path  # hooked\ (this script lives in hooked\mobile\scripts)
 $keyDir = "$env:USERPROFILE\.keystores"
 $keystore = "$keyDir\hooked-upload.jks"
 $pwFile = "$keyDir\hooked-upload.pw"
