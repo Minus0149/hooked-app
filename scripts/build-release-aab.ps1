@@ -42,7 +42,7 @@ Set-Location "$root\mobile"
 "sdk.dir=$($sdkRoot -replace '\\','/')" | Set-Content -Encoding ascii "local.properties.tmp"
 & $log "expo prebuild..."
 $env:CI = "1"
-npx expo prebuild -p android --no-install
+npx expo prebuild -p android --no-install --clean
 if ($LASTEXITCODE -ne 0) { throw "expo prebuild failed" }
 Move-Item "local.properties.tmp" "android\local.properties" -Force
 
@@ -51,6 +51,16 @@ Move-Item "local.properties.tmp" "android\local.properties" -Force
 $settings = "android\settings.gradle"
 (Get-Content $settings -Raw) -replace "rootProject.name = 'hooked.'", "rootProject.name = 'hooked'" |
   Set-Content -Encoding ascii $settings
+
+# Expo's template gives Gradle a 2 GB heap and 512 MB of metaspace. A --clean
+# (seen 2026-09-26 in expo-updates' KSP step; this machine has 32 GB)
+# release build of every native module outgrows that and the daemon dies with
+# OutOfMemoryError: Metaspace -- silently: the log just stops and the build
+# never ends. prebuild regenerates gradle.properties every run, so raise it here.
+$props = "android\gradle.properties"
+(Get-Content $props -Raw) -replace "org.gradle.jvmargs=.*", "org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=2048m -XX:+HeapDumpOnOutOfMemoryError" |
+  Set-Content -Encoding ascii $props
+if ((Get-Content $props -Raw) -notmatch "MaxMetaspaceSize=2048m") { throw "could not raise Gradle memory in $props" }
 
 # ---- point the release build at the real key ----
 # prebuild rewrites build.gradle every run, so this is applied here rather than
