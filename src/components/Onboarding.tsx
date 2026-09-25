@@ -1,3 +1,5 @@
+import { TOUR_COPY, tasteStepButton, type TourHeadline } from "../lib/tourCopy";
+import { Eq } from "./Eq";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Dimensions,
@@ -55,7 +57,7 @@ const GESTURE_STEPS: GestureStep[] = [
     dir: "up",
     headline: (
       <>
-        not feeling it? <Text style={{ color: "#FFFFFF" }}>swipe up</Text>
+        not feeling it? <Text style={{ color: colors.accentDefault }}>swipe up</Text>
       </>
     ),
     copy: "Skips to the next song instantly. No hard feelings — we learn from it anyway.",
@@ -67,7 +69,7 @@ const GESTURE_STEPS: GestureStep[] = [
     dir: "down",
     headline: (
       <>
-        love it? <Text style={{ color: colors.save }}>swipe down</Text>
+        love it? <Text style={{ color: colors.accentDefault }}>swipe down</Text>
       </>
     ),
     copy: "Saves it to your Liked Songs or a playlist — you choose where in settings.",
@@ -79,7 +81,7 @@ const GESTURE_STEPS: GestureStep[] = [
     dir: "right",
     headline: (
       <>
-        want more like it? <Text style={{ color: colors.more }}>swipe right</Text>
+        want more like it? <Text style={{ color: colors.accentDefault }}>swipe right</Text>
       </>
     ),
     copy: "Doesn't save it — just tells the algorithm to chase this exact vibe.",
@@ -91,7 +93,7 @@ const GESTURE_STEPS: GestureStep[] = [
     dir: "left",
     headline: (
       <>
-        hate it? <Text style={{ color: colors.never }}>swipe left</Text>
+        hate it? <Text style={{ color: colors.accentDefault }}>swipe left</Text>
       </>
     ),
     copy: "Never plays it again, and steers your feed far away from it.",
@@ -384,14 +386,9 @@ export function Onboarding({
             exiting={FadeOutUp.duration(180)}
             style={styles.stepWrap}
           >
-            <Text style={styles.headline}>
-              your next favorite song is{" "}
-              <Text style={{ color: colors.accentDefault }}>one swipe away</Text>
-            </Text>
-            <Text style={styles.copy}>
-              We play you the best part of songs you've never heard. Four swipes
-              teach us exactly what you love.
-            </Text>
+            <Headline h={TOUR_COPY.welcome.headline} />
+            <Text style={styles.copy}>{TOUR_COPY.welcome.copy}</Text>
+            <Eq color={colors.accentDefault} playing />
           </Animated.View>
         )}
 
@@ -402,18 +399,18 @@ export function Onboarding({
             exiting={FadeOutUp.duration(180)}
             style={styles.stepWrap}
           >
-            <Text style={[styles.headline, styles.headlineSm]}>
-              {step === 1
-                ? "what do you listen in?"
-                : step === 2
-                  ? "and what sounds?"
-                  : "how far off the map?"}
-            </Text>
+            <Headline
+              h={
+                step === 1
+                  ? TOUR_COPY.languages.headline
+                  : step === 2
+                    ? TOUR_COPY.genres.headline
+                    : TOUR_COPY.adventure.headline
+              }
+            />
             {step < 3 && (
               <Text style={styles.copy}>
-                {step === 1
-                  ? "Pick as many as you like. This matters more than genre."
-                  : "A rough steer, not a filter."}
+                {step === 1 ? TOUR_COPY.languages.copy : TOUR_COPY.genres.copy}
               </Text>
             )}
             {step === 3 ? (
@@ -509,7 +506,7 @@ export function Onboarding({
             <Text style={styles.copy}>
               {mood
                 ? `Nice — we'll open with ${moodById(mood)?.label.toLowerCase()}. Hold any card to change it, any time.`
-                : "Hold the card, push toward a face, let go. It steers the deck that way and tells us what the song feels like."}
+                : TOUR_COPY.hold.copy}
             </Text>
           </Animated.View>
         )}
@@ -542,7 +539,16 @@ export function Onboarding({
           style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
           onPress={() => setStep(1)}
         >
-          <Text style={styles.primaryText}>Show me how</Text>
+          <Text style={styles.primaryText}>{TOUR_COPY.start}</Text>
+        </Pressable>
+      )}
+      {step >= 1 && step <= TASTE_STEPS && (
+        // never blocked on an answer — an empty one simply tilts nothing
+        <Pressable
+          style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
+          onPress={() => setStep(step + 1)}
+        >
+          <Text style={styles.primaryText}>{tasteStepButton(step, taste)}</Text>
         </Pressable>
       )}
       {step > TASTE_STEPS && step < HOLD_STEP && (
@@ -582,7 +588,7 @@ export function Onboarding({
 
       {step < LAST_STEP ? (
         <Pressable style={styles.skip} hitSlop={8} onPress={finish}>
-          <Text style={styles.skipText}>Skip the tour</Text>
+          <Text style={styles.skipText}>{TOUR_COPY.skip}</Text>
         </Pressable>
       ) : (
         <View style={styles.skip} />
@@ -618,6 +624,15 @@ const absFill = {
   bottom: 0,
 };
 
+/** A tour headline: the plain lead, then the accented end (web's <em>). */
+function Headline({ h, small = false }: { h: TourHeadline; small?: boolean }) {
+  return (
+    <Text style={[styles.headline, small && styles.headlineSm]}>
+      {h.lead} <Text style={{ color: colors.accentDefault }}>{h.accent}</Text>
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   chips: {
     flexDirection: "row",
@@ -628,9 +643,12 @@ const styles = StyleSheet.create({
     maxWidth: 340,
     alignSelf: "center",
   },
+  // 44 tall, as on the web: the smallest thing a thumb hits reliably
   chip: {
-    paddingHorizontal: 15,
-    paddingVertical: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 44,
+    justifyContent: "center",
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.line,
@@ -640,7 +658,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accentDefault,
     backgroundColor: "rgba(255,61,113,0.16)",
   },
-  chipText: { color: colors.muted, fontSize: 13.5, fontWeight: "600" },
+  chipText: { color: colors.muted, fontSize: 13.5, fontFamily: fonts.bodySemiBold },
   chipTextOn: { color: colors.text },
   choices: { gap: 10, marginTop: 18, width: "100%", maxWidth: 340, alignSelf: "center" },
   choice: {
@@ -656,8 +674,8 @@ const styles = StyleSheet.create({
     borderColor: colors.accentDefault,
     backgroundColor: "rgba(255,61,113,0.14)",
   },
-  choiceLabel: { color: colors.text, fontSize: 14.5, fontWeight: "700" },
-  choiceCopy: { color: colors.muted, fontSize: 12 },
+  choiceLabel: { color: colors.text, fontSize: 14.5, fontFamily: fonts.bodyBold },
+  choiceCopy: { color: colors.muted, fontSize: 12, fontFamily: fonts.body },
   root: { flex: 1, backgroundColor: colors.bg, padding: 24 },
   wordmark: {
     fontFamily: fonts.display,
@@ -667,23 +685,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   stepArea: { flex: 1, justifyContent: "center" },
-  stepWrap: { alignItems: "center", gap: 18 },
+  stepWrap: { alignItems: "center", gap: 22 },
+  // web .ob-headline at a phone's width: clamp(26px, 7.5vw, 34px) is ~30
   headline: {
     fontFamily: fonts.display,
-    fontSize: 26,
-    lineHeight: 31,
+    fontSize: 30,
+    lineHeight: 33,
     color: colors.text,
-    letterSpacing: -0.6,
+    letterSpacing: -0.9,
     textAlign: "center",
   },
-  headlineSm: { fontSize: 20, lineHeight: 25 },
+  // the gesture steps' smaller headline (web sets 22px inline there)
+  headlineSm: { fontSize: 22, lineHeight: 25, letterSpacing: -0.6 },
   copy: {
     fontFamily: fonts.body,
     color: colors.muted,
-    fontSize: 13.5,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 22.5,
     textAlign: "center",
-    maxWidth: 300,
+    maxWidth: 280,
   },
   // 3:4 practice area — extra margin leaves room for the arrow outside it
   demo: { width: DEMO_W, aspectRatio: 3 / 4, marginVertical: 36 },

@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   interpolateColor,
@@ -132,6 +132,78 @@ export function GroupLabel({ children }: { children: ReactNode }) {
   return <Text style={styles.group}>{children}</Text>;
 }
 
+/**
+ * A row that isn't a button — it carries its own control on the right (a
+ * slider), like web's `div.settings-row` for Volume and Swipe distance.
+ */
+export function StaticRow({
+  icon,
+  iconColor,
+  label,
+  sub,
+  right,
+}: {
+  icon?: keyof typeof Feather.glyphMap;
+  iconColor?: string;
+  label: string;
+  sub?: string;
+  right?: ReactNode;
+}) {
+  return (
+    <View style={styles.row} accessibilityLabel={sub ? `${label}. ${sub}` : label}>
+      {icon && (
+        <View style={styles.rowIcon}>
+          <Feather name={icon} size={17} color={iconColor ?? colors.text} />
+        </View>
+      )}
+      <View style={styles.rowLabelWrap}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {sub ? <Text style={styles.rowSub}>{sub}</Text> : null}
+      </View>
+      {right}
+    </View>
+  );
+}
+
+/** The quiet word at a row's right edge — "save", "open", "change" (web .settings-row-value). */
+export function RowValue({ children, color }: { children: ReactNode; color?: string }) {
+  return <Text style={[styles.rowValue, color != null && { color }]}>{children}</Text>;
+}
+
+/**
+ * A labelled card holding one setting's controls, with an optional hint under
+ * them — web's `.prefs-block`, used on every settings sub-page.
+ */
+export function Block({
+  label,
+  hint,
+  children,
+  style,
+}: {
+  label?: string;
+  hint?: ReactNode;
+  children?: ReactNode;
+  style?: object;
+}) {
+  return (
+    <View style={[styles.block, style]}>
+      {label ? <Text style={styles.blockLabel}>{label}</Text> : null}
+      {children}
+      {hint ? <Text style={styles.blockHint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+/** A hint line outside any card (web `.prefs-hint`). */
+export function Hint({ children }: { children: ReactNode }) {
+  return <Text style={styles.hintLine}>{children}</Text>;
+}
+
+/** A bare label above chips that sit outside a card (web `.prefs-label`). */
+export function FieldLabel({ children }: { children: ReactNode }) {
+  return <Text style={[styles.blockLabel, { marginTop: 14, marginBottom: 8 }]}>{children}</Text>;
+}
+
 const styles = StyleSheet.create({
   group: {
     fontFamily: fonts.bodyBold,
@@ -175,6 +247,31 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.text },
   rowSub: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },
   rowValue: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.muted },
+  block: {
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    marginBottom: 8,
+  },
+  blockLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    color: colors.muted,
+    marginBottom: 2,
+  },
+  blockHint: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 19, color: colors.muted },
+  hintLine: {
+    fontFamily: fonts.body,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: colors.muted,
+    marginBottom: 10,
+  },
   toggle: {
     width: 42,
     height: 25,

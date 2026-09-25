@@ -33,6 +33,10 @@ const MODULES = [
   "data/sound.ts",
   "lib/playlistMood.ts",
   "lib/contrast.ts",
+  "lib/accessApply.ts",
+  "lib/accountDeletion.ts",
+  "lib/tourCopy.ts",
+  "lib/volume.ts",
 ];
 
 try {

@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet } from "react-native";
 import Slider from "@react-native-community/slider";
 import { SettingsPage } from "./SettingsPage";
-import { GroupLabel, Segmented } from "./kit";
+import { Block, Segmented, StaticRow } from "./kit";
 import { useStore } from "../../state/store";
-import { colors, fonts } from "../../design/tokens";
+import { colors } from "../../design/tokens";
 import { HAPTICS_LEVELS, type HapticsLevel } from "../../data/prefs";
 
 /**
@@ -17,47 +17,37 @@ export function GesturesPage({ onBack }: { onBack: () => void }) {
 
   return (
     <SettingsPage title="Gestures" sub="Tune the four swipes to your wrist." onBack={onBack}>
-      <GroupLabel>swipe distance</GroupLabel>
-      <View style={styles.card}>
-        <Slider
-          minimumValue={0.6}
-          maximumValue={1.4}
-          step={0.05}
-          value={s}
-          onSlidingComplete={(v) => setPrefs({ swipeSensitivity: Math.round(v * 100) / 100 })}
-          minimumTrackTintColor={colors.accentDefault}
-          maximumTrackTintColor={colors.line}
-          thumbTintColor={colors.accentDefault}
-          accessibilityLabel="swipe distance"
-        />
-        <View style={styles.hints}>
-          <Text style={[styles.hint, s < 0.9 && styles.hintOn]}>feather-light</Text>
-          <Text style={[styles.hint, s >= 0.9 && s <= 1.1 && styles.hintOn]}>default</Text>
-          <Text style={[styles.hint, s > 1.1 && styles.hintOn]}>deliberate</Text>
-        </View>
-      </View>
-
-      <GroupLabel>haptics</GroupLabel>
-      <Segmented<HapticsLevel>
-        options={HAPTICS_LEVELS}
-        value={state.prefs.haptics}
-        onChange={(haptics) => setPrefs({ haptics })}
+      <StaticRow
+        icon="move"
+        iconColor={colors.save}
+        label="Swipe distance"
+        sub={s < 0.9 ? "feather-light flicks" : s > 1.1 ? "deliberate drags" : "the shipped default"}
+        right={
+          <Slider
+            style={styles.slider}
+            minimumValue={0.6}
+            maximumValue={1.4}
+            step={0.05}
+            value={s}
+            onSlidingComplete={(v) => setPrefs({ swipeSensitivity: Math.round(v * 100) / 100 })}
+            minimumTrackTintColor={colors.accentDefault}
+            maximumTrackTintColor={colors.line}
+            thumbTintColor={colors.text}
+            accessibilityLabel="swipe distance sensitivity"
+          />
+        }
       />
+      <Block label="Haptics">
+        <Segmented<HapticsLevel>
+          options={HAPTICS_LEVELS}
+          value={state.prefs.haptics}
+          onChange={(haptics) => setPrefs({ haptics })}
+        />
+      </Block>
     </SettingsPage>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  hints: { flexDirection: "row", justifyContent: "space-between", paddingBottom: 4 },
-  hint: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.muted },
-  hintOn: { color: colors.text },
+  slider: { width: 124, height: 32 },
 });

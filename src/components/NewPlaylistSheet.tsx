@@ -38,6 +38,7 @@ export function NewPlaylistSheet({
   onClose: () => void;
 }) {
   const [name, setName] = useState("");
+  const [focused, setFocused] = useState(false);
   const [accent, setAccent] = useState(PLAYLIST_SWATCHES[1]);
   const [rules, setRules] = useState<PlaylistRules>({});
   const [mood, setMood] = useState<MoodId | null>(null);
@@ -115,7 +116,10 @@ export function NewPlaylistSheet({
 
             <Text style={styles.rulesLabel}>name</Text>
             <TextInput
-              style={styles.input}
+              // web .auth-input:focus — the field takes the accent while typing
+              style={[styles.input, focused && { borderColor: withAlpha(accent, 0.7) }]}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               autoFocus
               placeholder="late night drives, gym, focus…"
               placeholderTextColor={colors.muted}

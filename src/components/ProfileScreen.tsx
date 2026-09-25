@@ -1,3 +1,4 @@
+import { emailLooksValid } from "../lib/accessApply";
 import { useMemo, useState } from "react";
 import {
   Image,
@@ -186,8 +187,11 @@ export function ProfileScreen({
   );
 }
 
-/** Web's AuthForm, ported to RN TextInputs. */
-function AuthForm({ accent }: { accent: string }) {
+/**
+ * Web's AuthForm, ported to RN TextInputs. `compact` drops the headline and
+ * copy — the invite gate shows it under its own pitch, as the web gate does.
+ */
+export function AuthForm({ accent, compact = false }: { accent: string; compact?: boolean }) {
   const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -196,8 +200,18 @@ function AuthForm({ accent }: { accent: string }) {
   const [resetSent, setResetSent] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  // the button stays live, as on the web; what the browser's required and
+  // minLength checks say there is said inline here
   const submit = async () => {
-    if (!email.trim() || !password) return;
+    if (busy) return;
+    if (!emailLooksValid(email)) {
+      setError("that email doesn't look right");
+      return;
+    }
+    if (password.length < 8) {
+      setError("passwords are 8 characters or more");
+      return;
+    }
     setError(null);
     setBusy(true);
     const result =
@@ -236,32 +250,29 @@ function AuthForm({ accent }: { accent: string }) {
     }
   };
 
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.authBody}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <Animated.View entering={ENTER(0)} style={{ gap: 14 }}>
-        <Text style={styles.authTitle}>
-          {mode === "signup" ? (
-            <>
-              keep your taste{" "}
-              <Text style={{ color: accent, fontStyle: "italic" }}>forever</Text>
-            </>
-          ) : (
-            <>
-              welcome{" "}
-              <Text style={{ color: accent, fontStyle: "italic" }}>back</Text>
-            </>
-          )}
-        </Text>
-        <Text style={styles.authCopy}>
-          {mode === "signup"
-            ? "Create an account and every swipe, like and playlist follows you across devices."
-            : "Sign in to pick up your library where you left it."}
-        </Text>
+  const form = (
+      <Animated.View entering={ENTER(0)} style={{ gap: 16 }}>
+        {!compact && (
+          <>
+            <Text style={styles.authTitle}>
+              {mode === "signup" ? (
+                <>
+                  keep your taste{"\n"}
+                  <Text style={{ color: accent }}>forever</Text>
+                </>
+              ) : (
+                <>
+                  welcome <Text style={{ color: accent }}>back</Text>
+                </>
+              )}
+            </Text>
+            <Text style={styles.authCopy}>
+              {mode === "signup"
+                ? "Create an account and every swipe, like and playlist follows you across devices."
+                : "Sign in to pick up your library where you left it."}
+            </Text>
+          </>
+        )}
 
         {/* 01 — identity */}
         <View style={styles.cluster}>
@@ -281,7 +292,9 @@ function AuthForm({ accent }: { accent: string }) {
           <Text style={styles.clusterHint}>
             {mode === "signup"
               ? "the email your library will follow across devices"
-              : "the one you signed up with"}
+              : resetSent
+                ? "reset link sent — check that inbox (and the promotions tab)"
+                : "the one you signed up with"}
           </Text>
         </View>
 
@@ -290,7 +303,7 @@ function AuthForm({ accent }: { accent: string }) {
           <Text style={styles.clusterTitle}>password</Text>
           <TextInput
             style={styles.input}
-            placeholder={mode === "signup" ? "create a password" : "your password"}
+            placeholder={mode === "signup" ? "create a password (8+ characters)" : "your password"}
             placeholderTextColor={colors.muted}
             value={password}
             onChangeText={setPassword}
@@ -300,13 +313,9 @@ function AuthForm({ accent }: { accent: string }) {
             returnKeyType="go"
             onSubmitEditing={() => void submit()}
           />
-          <Text style={styles.clusterHint}>
-            {mode === "signup"
-              ? "hashed on our side — even we can't read it"
-              : resetSent
-                ? "reset link sent — check that inbox (and promotions)"
-                : "eight characters minimum"}
-          </Text>
+          {mode === "signup" && (
+            <Text style={styles.clusterHint}>hashed on our side — even we can't read it</Text>
+          )}
           {mode === "signin" && !resetSent && (
             <Pressable onPress={() => void sendReset()}>
               <Text style={[styles.clusterHint, { color: accent, textDecorationLine: "underline" }]}>
@@ -321,11 +330,10 @@ function AuthForm({ accent }: { accent: string }) {
         <Pressable
           style={({ pressed }) => [
             styles.primaryBtn,
-            { backgroundColor: accent },
-            (busy || !email.trim() || password.length < 8) && { opacity: 0.5 },
+            busy && { opacity: 0.5 },
             pressed && styles.pressed,
           ]}
-          disabled={busy || !email.trim() || password.length < 8}
+          disabled={busy}
           onPress={() => void submit()}
         >
           <Text style={styles.primaryBtnText}>
@@ -346,6 +354,18 @@ function AuthForm({ accent }: { accent: string }) {
           </Text>
         </Pressable>
       </Animated.View>
+  );
+
+  // inside the gate's own scrolling card, a second scroll view would fight it
+  if (compact) return <View style={{ paddingTop: 8 }}>{form}</View>;
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={styles.authBody}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      {form}
     </ScrollView>
   );
 }
@@ -480,11 +500,13 @@ const styles = StyleSheet.create({
   },
 
   // ----- auth form -----
+  // web .profile-body: the form sits in the middle of the screen, not the top
   authBody: {
+    flexGrow: 1,
+    justifyContent: "center",
     paddingHorizontal: 24,
-    paddingTop: 26,
-    paddingBottom: 24,
-    gap: 14,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   // plain labelled fields — the numbered boxes-in-a-card read as a form
   // within a form (mirrors web's .auth-field)
@@ -508,16 +530,19 @@ const styles = StyleSheet.create({
   authTitle: {
     fontFamily: fonts.display,
     fontSize: 24,
-    lineHeight: 31,
-    letterSpacing: -0.6,
+    lineHeight: 27,
+    letterSpacing: -0.7,
     color: colors.text,
+    textAlign: "center",
   },
   authCopy: {
     fontFamily: fonts.body,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 22,
     color: colors.muted,
-    marginBottom: 4,
+    textAlign: "center",
+    maxWidth: 280,
+    alignSelf: "center",
   },
   input: {
     width: "100%",
@@ -536,24 +561,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.never,
   },
+  // web .ob-primary: the big light button, same as the tour's
   primaryBtn: {
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: radii.pill,
-    marginTop: 4,
+    paddingVertical: 17,
+    borderRadius: 18,
+    backgroundColor: colors.text,
   },
   primaryBtnText: {
     fontFamily: fonts.displayBold,
-    fontSize: 13.5,
+    fontSize: 15,
     color: colors.ink,
   },
+  // web .ob-skip: a finger's worth of box around a quiet link
   switchMode: {
-    fontFamily: fonts.bodySemiBold,
+    fontFamily: fonts.bodyMedium,
     fontSize: 13.5,
     color: colors.muted,
     textAlign: "center",
-    paddingVertical: 8,
+    paddingVertical: 14,
+    minHeight: 44,
   },
 });

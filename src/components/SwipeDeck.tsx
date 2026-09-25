@@ -1,3 +1,4 @@
+import { Portal, usePortalAvailable } from "./Portal";
 import {
   memo,
   useCallback,
@@ -489,6 +490,7 @@ export function SwipeDeck({
    */
   const wrapRef = useRef<View>(null);
   const [host, setHost] = useState({ x: 0, y: 0, width: SCREEN_W, height: SCREEN_H });
+  const lifted = usePortalAvailable();
   // The fan labels one specific song. If the card moves on under it — a swipe,
   // a revert, an auto-advance — the question is about a card nobody is looking
   // at, so it closes rather than quietly retargeting.
@@ -804,9 +806,12 @@ export function SwipeDeck({
       </View>
 
       {wheel && onDeck ? (
+        // lifted to the app root like the web's portal: the backdrop covers the
+        // whole phone and the hint sits along its bottom, not over the controls
+        <Portal>
         <MoodWheel
           origin={wheel}
-          host={host}
+          host={lifted ? { x: 0, y: 0, width: SCREEN_W, height: SCREEN_H } : host}
           aim={aim}
           picked={pickedMood}
           active={activeMood}
@@ -818,6 +823,7 @@ export function SwipeDeck({
           }}
           onCancel={closeWheel}
         />
+        </Portal>
       ) : null}
     </View>
   );

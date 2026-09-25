@@ -1,4 +1,9 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+﻿import { storedVolume } from "./src/lib/volume";
+import { SupportPage } from "./src/components/settings/SupportPage";
+import { AccessGate, AccessPending } from "./src/components/AccessGate";
+import { DELETE_ACCOUNT_ARGS } from "./src/lib/accountDeletion";
+import { PortalHost } from "./src/components/Portal";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import {
   AppState,
   BackHandler,
@@ -93,7 +98,7 @@ const FREE_SWIPES = 5;
 
 const convex = new ConvexReactClient(CONVEX_URL);
 
-type SettingsPageId = "appearance" | "playback" | "gestures" | "sound" | "data";
+type SettingsPageId = "appearance" | "playback" | "gestures" | "sound" | "data" | "support";
 type Screen =
   | "home"
   | "discover"
@@ -513,7 +518,6 @@ function Shell() {
   >(null);
   // bumped by "I've confirmed it" to ask the server again
   const [accessCheck, setAccessCheck] = useState(0);
-  const [resent, setResent] = useState<"idle" | "sending" | "sent" | "failed">("idle");
   useEffect(() => {
     if (profileStage === "signed-out") {
       setAccessState(null);
@@ -548,7 +552,7 @@ function Shell() {
   const handleDeleteAccount = useCallback(() => {
     void (async () => {
       try {
-        await deleteAccountMutation({});
+        await deleteAccountMutation(DELETE_ACCOUNT_ARGS);
       } catch (err) {
         notify(
           `Could not delete the account — ${err instanceof Error ? err.message : "try again in a moment"}`,
@@ -592,19 +596,11 @@ function Shell() {
     [unblockArtist, signedIn, unblockArtistMutation, syncWrite],
   );
 
-  const promptAuth = useCallback(
-    (message: string) => {
-      void confirm({
-        title: "Create an account",
-        body: message,
-        cancelLabel: "Not now",
-        confirmLabel: "Sign in",
-      }).then((ok) => {
-        if (ok) push("profile");
-      });
-    },
-    [push, confirm],
-  );
+  /**
+   * The wall a guest meets — the invite application, as on the web. "save" is
+   * a swipe down (saving needs an account), "limit" is the free swipes spent.
+   */
+  const [gate, setGate] = useState<"save" | "limit" | null>(null);
 
   /** The login wall refuses BEFORE anything commits — web parity. */
   const gateSwipe = useCallback(
@@ -612,22 +608,20 @@ function Shell() {
       if (signedIn) return true;
       const action = DIR_TO_ACTION[dir];
       if (action === "save") {
-        promptAuth("Create an account to save songs and playlists across devices.");
+        setGate("save");
         return false;
       }
       // the wall's distance is live config (gateFreeSwipes) — admins move it
       // without a release; 5 covers the moment before the query first answers
       if (anonSwipeCount.current >= (runtimeCfg?.gateFreeSwipes ?? FREE_SWIPES)) {
-        promptAuth(
-          "You've used your 5 free swipes. Sign in to keep discovering and sync your taste.",
-        );
+        setGate("limit");
         return false;
       }
       anonSwipeCount.current += 1;
       void AsyncStorage.setItem(ANON_SWIPES_KEY, String(anonSwipeCount.current));
       return true;
     },
-    [signedIn, promptAuth, runtimeCfg],
+    [signedIn, runtimeCfg],
   );
 
   // hydrate the local store from the cloud library ONCE per signed-in user —
@@ -810,12 +804,11 @@ function Shell() {
   // device-local volume: hardware differs, so this never syncs to the profile
   const [volume, setVolumeState] = useState(1);
   useEffect(() => {
+    // nothing saved on a fresh install must mean full volume, not muted
     void AsyncStorage.getItem(VOLUME_KEY).then((v) => {
-      const n = Number(v);
-      if (Number.isFinite(n) && n >= 0 && n <= 1) {
-        setVolumeState(n);
-        player.volume = n;
-      }
+      const n = storedVolume(v);
+      setVolumeState(n);
+      player.volume = n;
     });
   }, [player]);
   const handleVolume = useCallback(
@@ -1228,70 +1221,14 @@ function Shell() {
   // Signed in, but the account isn't approved. This used to be swallowed, so
   // the app looked signed in and quietly never synced anything.
   if (accessState && accessState !== "ok") {
-    const copy = {
-      pending: {
-        title: "thank you for your interest",
-        body: "Your request is with us. We'll get back to you — once you're approved this screen becomes the deck.",
-      },
-      rejected: {
-        title: "not this round",
-        body: "Your request wasn't approved for this round. Nothing else on your account has changed.",
-      },
-      none: {
-        title: "hooked is invite-only",
-        body: "Ask for access and we'll get back to you. It takes a minute.",
-      },
-      unverified: {
-        title: "check your inbox",
-        body: `You're approved. We sent a confirmation link to ${session.data?.user?.email ?? "your email"} — open it, then come back here.`,
-      },
-    }[accessState];
+    // the same card and the same four answers as the web app's AccessPending
     return (
-      <View style={[styles.root, styles.gate]}>
-        <Text style={styles.gateTitle}>{copy.title}</Text>
-        <Text style={styles.gateBody}>{copy.body}</Text>
-        {accessState === "none" && (
-          <Pressable
-            style={styles.gateButton}
-            onPress={() => {
-              void Linking.openURL(`${SITE_URL}/beta`).catch(() => undefined);
-            }}
-          >
-            <Text style={styles.gateButtonText}>ask for access</Text>
-          </Pressable>
-        )}
-        {accessState === "unverified" && (
-          <>
-            <Pressable style={styles.gateButton} onPress={() => setAccessCheck((n) => n + 1)}>
-              <Text style={styles.gateButtonText}>I've confirmed it</Text>
-            </Pressable>
-            <Pressable
-              disabled={resent === "sending" || resent === "sent"}
-              onPress={() => {
-                const email = session.data?.user?.email;
-                if (!email) return;
-                setResent("sending");
-                void authClient
-                  .sendVerificationEmail({ email, callbackURL: WEB_APP_URL })
-                  .then((r: { error?: unknown } | null) => setResent(r?.error ? "failed" : "sent"))
-                  .catch(() => setResent("failed"));
-              }}
-            >
-              <Text style={styles.gateLink}>
-                {resent === "sending"
-                  ? "sending…"
-                  : resent === "sent"
-                    ? "sent — give it a minute (and check spam)"
-                    : resent === "failed"
-                      ? "couldn't send — try again"
-                      : "resend the link"}
-              </Text>
-            </Pressable>
-          </>
-        )}
-        <Pressable onPress={() => void authClient.signOut()}>
-          <Text style={styles.gateLink}>sign out</Text>
-        </Pressable>
+      <View style={styles.root}>
+        <AccessPending
+          reason={accessState}
+          email={session.data?.user?.email ?? "your email"}
+          onRecheck={() => setAccessCheck((n) => n + 1)}
+        />
       </View>
     );
   }
@@ -1318,6 +1255,8 @@ function Shell() {
 
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
+      {/* overlays that must cover the whole screen (the deck's mood wheel) */}
+      <PortalHost>
       {screen === "home" && (
         <>
           <View style={styles.topbar}>
@@ -1467,6 +1406,7 @@ function Shell() {
         />
       )}
       {screen === "settings:gestures" && <GesturesPage onBack={pop} />}
+      {screen === "settings:support" && <SupportPage onBack={pop} />}
       {screen === "settings:sound" && (
         <SoundPage
           onBack={pop}
@@ -1532,6 +1472,14 @@ function Shell() {
         </View>
       )}
 
+      {gate && !signedIn && (
+        <AccessGate
+          freeSwipes={runtimeCfg?.gateFreeSwipes ?? FREE_SWIPES}
+          accent={accent}
+          onClose={() => setGate(null)}
+        />
+      )}
+
       {/* over-the-air update: slides in when a bundle has downloaded */}
       <UpdateBanner />
 
@@ -1558,6 +1506,7 @@ function Shell() {
       )}
 
       <StatusBar style="light" />
+      </PortalHost>
     </SafeAreaView>
   );
 }
@@ -1598,29 +1547,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  gate: { alignItems: "center", justifyContent: "center", padding: 32, gap: 14 },
-  gateTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.text,
-    textAlign: "center",
-  },
-  gateBody: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: colors.muted,
-    textAlign: "center",
-    maxWidth: 320,
-  },
-  gateButton: {
-    marginTop: 8,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 999,
-    backgroundColor: colors.accentDefault,
-  },
-  gateButtonText: { color: "#0b0b10", fontWeight: "700", fontSize: 14 },
-  gateLink: { marginTop: 10, color: colors.muted, fontSize: 13 },
   root: { flex: 1, backgroundColor: colors.bg },
   topbar: {
     flexDirection: "row",

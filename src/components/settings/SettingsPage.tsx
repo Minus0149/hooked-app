@@ -4,8 +4,9 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { colors, fonts, radii } from "../../design/tokens";
 
 /**
- * Chrome for a Settings sub-page: back button, title, and the page's rows in
- * a scroll view. Exists so "deeper navigation" is one `push("settings:x")`
+ * Chrome for a Settings sub-page, laid out like web's PageShell: back button
+ * and the wordmark in the bar, then the page's title large on the left with
+ * its one-line description, then the rows — in a scroll view. Exists so "deeper navigation" is one `push("settings:x")`
  * away instead of another flat column — every page gets its own stack entry,
  * so Android hardware back walks out of it naturally.
  */
@@ -29,11 +30,11 @@ export function SettingsPage({
           accessibilityRole="button"
           accessibilityLabel="back to settings"
         >
-          <Feather name="chevron-left" size={20} color={colors.text} />
+          <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={styles.title}>{title}</Text>
-        </View>
+        <Text style={styles.wordmark}>
+          hooked<Text style={{ color: colors.accentDefault }}>.</Text>
+        </Text>
         <View style={{ width: 42, height: 42 }} />
       </View>
       <Animated.ScrollView
@@ -42,6 +43,9 @@ export function SettingsPage({
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
+        <Text style={styles.title} accessibilityRole="header">
+          {title}
+        </Text>
         {sub ? <Text style={styles.sub}>{sub}</Text> : null}
         {children}
       </Animated.ScrollView>
@@ -58,11 +62,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  title: {
+  wordmark: {
     fontFamily: fonts.display,
-    fontSize: 18,
+    fontSize: 16,
     color: colors.text,
     letterSpacing: -0.3,
+  },
+  title: {
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: -0.5,
+    color: colors.text,
+    marginBottom: 6,
   },
   topBtn: {
     width: 42,
@@ -80,6 +91,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: colors.muted,
-    marginBottom: 12,
+    marginBottom: 16,
   },
 });

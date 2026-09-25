@@ -1,7 +1,7 @@
 import { Linking, Share } from "react-native";
 import { useDialogs } from "../Dialogs";
 import { SettingsPage } from "./SettingsPage";
-import { GroupLabel, Row } from "./kit";
+import { Row, RowValue } from "./kit";
 import { useStore } from "../../state/store";
 import { colors } from "../../design/tokens";
 import { SITE_URL, WEB_APP_URL } from "../../config/env";
@@ -57,100 +57,90 @@ export function DataPage({
     }
   };
 
+  const open = (url: string, what: string) =>
+    void Linking.openURL(url).catch(() => {
+      notify(`Could not open ${what} — it's at ${url}`, "error");
+    });
+
+  // one list in web's order; the only difference is the second row, which on
+  // the web invites you onto the phone and here points the other way
   return (
     <SettingsPage
       title="Data & privacy"
       sub="What hooked keeps about you, and what you can do about it."
       onBack={onBack}
     >
-      <GroupLabel>your data</GroupLabel>
       <Row
         icon="download"
         iconColor={colors.more}
         label="Export my library"
         sub="your lists and answers as JSON"
+        right={<RowValue>save</RowValue>}
         onPress={() => void exportData()}
       />
       <Row
-        icon="shield"
-        label="Privacy & terms"
-        sub="how your listening data is handled"
-        onPress={() =>
-          void Linking.openURL(`${SITE_URL}/privacy`).catch(() => {
-            notify(`Could not open the privacy policy — it's at ${SITE_URL}/privacy`, "error");
-          })
-        }
+        icon="globe"
+        iconColor={colors.save}
+        label="Use it on the web"
+        sub={WEB_APP_URL.replace(/^https?:\/\//, "")}
+        right={<RowValue>open</RowValue>}
+        onPress={() => open(WEB_APP_URL, "the web app")}
       />
-
-      <GroupLabel>this device</GroupLabel>
       <Row
-        icon="rotate-ccw"
+        icon="refresh-cw"
         label="Replay the swipe tutorial"
         sub="relearn the four gestures"
         onPress={onReplayTutorial}
+      />
+      <Row
+        icon="file-text"
+        label="Privacy & terms"
+        sub="what we store, and how to get it deleted"
+        right={<RowValue>open</RowValue>}
+        onPress={() => open(`${SITE_URL}/privacy`, "the privacy policy")}
       />
       <Row
         icon="x"
         iconColor={colors.never}
         label="Reset local data"
         labelColor={colors.never}
-        sub="clears your library and history on this device"
+        sub="cloud library is untouched"
         onPress={async () => {
           const ok = await confirm({
             title: "Clear this device?",
-            body: "Your local library and history on this phone are removed. Anything synced to your account stays.",
+            body: "Your local library and history on this device are removed. Anything synced to your account stays.",
             confirmLabel: "Clear",
             danger: true,
           });
           if (ok) onResetData();
         }}
       />
-
       {signedIn && (
-        <>
-          <GroupLabel>account</GroupLabel>
-          <Row
-            icon="trash-2"
-            iconColor={colors.never}
-            label="Delete my account"
-            labelColor={colors.never}
-            sub="removes your account and everything saved to it, for good"
-            onPress={async () => {
-              const ok = await confirm({
-                title: "Delete your account?",
-                body: "Your profile, swipes, library and playlists are erased. This can't be undone.",
-                confirmLabel: "Delete my account",
-                danger: true,
-              });
-              if (ok) onDeleteAccount();
-            }}
-          />
-        </>
+        <Row
+          icon="x"
+          iconColor={colors.never}
+          label="Delete my account"
+          labelColor={colors.never}
+          sub="removes your library, playlists and history for good"
+          onPress={async () => {
+            // two steps, as on the web: this one can't be undone
+            const first = await confirm({
+              title: "Delete your account?",
+              body: "Your account and everything in it goes. This can't be undone.",
+              confirmLabel: "Continue",
+              danger: true,
+            });
+            if (!first) return;
+            const last = await confirm({
+              title: "Last check",
+              body: "Your library, playlists and swipe history are deleted for good.",
+              confirmLabel: "Delete my account",
+              danger: true,
+            });
+            if (last) onDeleteAccount();
+          }}
+        />
       )}
-
-      <GroupLabel>elsewhere</GroupLabel>
-      <Row
-        icon="external-link"
-        iconColor={colors.more}
-        label="Website"
-        sub={SITE_URL.replace(/^https?:\/\//, "")}
-        onPress={() =>
-          void Linking.openURL(SITE_URL).catch(() => {
-            notify(`Could not open the website — it's at ${SITE_URL}`, "error");
-          })
-        }
-      />
-      <Row
-        icon="globe"
-        iconColor={colors.accentDefault}
-        label="Web app"
-        sub={WEB_APP_URL.replace(/^https?:\/\//, "")}
-        onPress={() =>
-          void Linking.openURL(WEB_APP_URL).catch(() => {
-            notify(`Could not open the web app — it's at ${WEB_APP_URL}`, "error");
-          })
-        }
-      />
     </SettingsPage>
   );
 }

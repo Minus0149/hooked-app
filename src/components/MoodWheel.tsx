@@ -266,7 +266,9 @@ export function MoodWheel({
         exiting={FadeOut.duration(120)}
         style={styles.backdrop}
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+        {/* closes on touch-down, like the web's onPointerDown: a thumb that
+            lands off the wheel means "not this", whether or not it then drags */}
+        <Pressable style={StyleSheet.absoluteFill} onPressIn={onCancel} />
       </Animated.View>
 
       <View pointerEvents="box-none" style={[styles.ring, { left: cx, top: cy }]}>

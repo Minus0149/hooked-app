@@ -1,7 +1,7 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SettingsPage } from "./SettingsPage";
-import { GroupLabel, Row, Segmented, Toggle } from "./kit";
+import { FieldLabel, GroupLabel, Hint, Row, RowValue, Segmented, Toggle } from "./kit";
 import { ReplayRules } from "../ReplayRules";
 import { useStore } from "../../state/store";
 import { colors, fonts } from "../../design/tokens";
@@ -56,8 +56,12 @@ export function SoundPage({
   );
 
   return (
-    <SettingsPage title="Sound & taste" sub="Steer what the deck deals your way." onBack={onBack}>
-      <GroupLabel>languages</GroupLabel>
+    <SettingsPage
+      title="Sound & taste"
+      sub="The deck tilts toward these answers without ever walling anything out."
+      onBack={onBack}
+    >
+      <FieldLabel>Languages</FieldLabel>
       <View style={styles.chipWrap}>
         {options.languages.map((l) =>
           chip(taste.languages.includes(l.id), l.label, () =>
@@ -66,7 +70,7 @@ export function SoundPage({
         )}
       </View>
 
-      <GroupLabel>genres</GroupLabel>
+      <FieldLabel>Genres</FieldLabel>
       <View style={styles.chipWrap}>
         {options.genres.map((g) =>
           chip(taste.genres.includes(g.id), g.label, () =>
@@ -75,7 +79,7 @@ export function SoundPage({
         )}
       </View>
 
-      <GroupLabel>adventure</GroupLabel>
+      <FieldLabel>Adventure</FieldLabel>
       <Segmented<Adventure>
         options={ADVENTURE.map((a) => ({ id: a.id, label: a.label }))}
         value={taste.adventure}
@@ -83,18 +87,21 @@ export function SoundPage({
       />
 
       <GroupLabel>discovery rules</GroupLabel>
-      <Text style={styles.rulesHint}>
-        The deck's default strictness. Playlists can relax these for themselves.
-      </Text>
+      <Hint>
+        The deck's default strictness. Playlists can relax these for themselves,
+        per playlist.
+      </Hint>
       {(
         [
-          ["allowRepeats", "Allow songs to reappear", "saved songs can come back around"],
-          ["includeBuried", "Deal buried songs", "left-swiped songs can return"],
-          ["includeBlockedArtists", "Deal blocked artists", "blocked artists can return"],
+          ["allowRepeats", "Allow songs to reappear", "saved songs can come back around", "refresh-cw", colors.more],
+          ["includeBuried", "Deal buried songs", "songs you swiped left can return", "x", colors.never],
+          ["includeBlockedArtists", "Deal blocked artists", "artists you blocked can return", "x", colors.never],
         ] as const
-      ).map(([key, label, sub]) => (
+      ).map(([key, label, sub, icon, iconColor]) => (
         <Row
           key={key}
+          icon={icon}
+          iconColor={iconColor}
           label={label}
           sub={sub}
           right={<Toggle on={state.prefs[key]} />}
@@ -109,20 +116,22 @@ export function SoundPage({
         <>
           <GroupLabel>blocked artists</GroupLabel>
           <Row
-            icon="slash"
+            icon="x"
             iconColor={colors.never}
             label={`Blocked artists (${state.neverArtists.length})`}
             sub="their songs never reach your deck"
-            chevron
+            right={<RowValue>{showBlocked ? "hide" : "unblock"}</RowValue>}
             onPress={() => setShowBlocked((v) => !v)}
           />
           {showBlocked &&
             state.neverArtists.slice(0, 50).map((a) => (
               <Row
                 key={a}
+                icon="more-horizontal"
+                iconColor={colors.muted}
                 label={a}
                 sub="blocked"
-                right={<Text style={styles.unblock}>unblock</Text>}
+                right={<RowValue color={colors.more}>unblock</RowValue>}
                 onPress={() => onUnblockArtist(a)}
               />
             ))}
@@ -133,13 +142,6 @@ export function SoundPage({
 }
 
 const styles = StyleSheet.create({
-  rulesHint: {
-    fontFamily: fonts.body,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: colors.muted,
-    marginBottom: 8,
-  },
   chipWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -155,10 +157,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface2,
   },
   chipText: { fontFamily: fonts.bodySemiBold, fontSize: 12.5, color: colors.text },
-  unblock: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 12.5,
-    color: colors.more,
-  },
 });
 

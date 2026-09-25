@@ -1,6 +1,6 @@
 import { Pressable, View, StyleSheet } from "react-native";
 import { SettingsPage } from "./SettingsPage";
-import { GroupLabel, Segmented } from "./kit";
+import { Block, Segmented } from "./kit";
 import { useStore } from "../../state/store";
 import { colors } from "../../design/tokens";
 import {
@@ -18,10 +18,10 @@ export function AppearancePage({ onBack }: { onBack: () => void }) {
   return (
     <SettingsPage
       title="Appearance"
-      sub="How hooked looks on this screen. Changes apply instantly."
+      sub="How hooked looks on this screen."
       onBack={onBack}
     >
-      <GroupLabel>accent</GroupLabel>
+      <Block label="Accent">
       <Segmented<AccentMode>
         options={[
           { id: "track", label: "From each song" },
@@ -47,13 +47,15 @@ export function AppearancePage({ onBack }: { onBack: () => void }) {
           })}
         </View>
       )}
+      </Block>
 
-      <GroupLabel>motion</GroupLabel>
-      <Segmented<MotionLevel>
-        options={MOTION_LEVELS}
-        value={prefs.motion}
-        onChange={(motion) => setPrefs({ motion })}
-      />
+      <Block label="Motion" hint="off also skips the vinyl save animation">
+        <Segmented<MotionLevel>
+          options={MOTION_LEVELS}
+          value={prefs.motion}
+          onChange={(motion) => setPrefs({ motion })}
+        />
+      </Block>
     </SettingsPage>
   );
 }
@@ -63,8 +65,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
-    marginTop: 10,
-    marginBottom: 4,
   },
   swatch: {
     width: 40,
