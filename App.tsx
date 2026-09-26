@@ -81,7 +81,7 @@ import { FullSongSheet } from "./src/components/FullSongSheet";
 import { UpdateBanner } from "./src/components/UpdateBanner";
 import { SponsoredCard, type AdCardData } from "./src/components/SponsoredCard";
 import { shouldAskForAd } from "./src/lib/ads-scheduler";
-import { PROMOTED_LISTEN_MS, promotedDue, promotedOutcome } from "./src/lib/promoted";
+import { PROMOTED_LISTEN_MS, promotedDue, promotedFollowUp, promotedOutcome } from "./src/lib/promoted";
 import { colors, fonts, radii } from "./src/design/tokens";
 import {
   DIR_TO_ACTION,
@@ -785,6 +785,7 @@ function Shell() {
   const promoSwipes = useRef(0);
   const promoEvery = useRef(10);
   const [promoDue, setPromoDue] = useState(false);
+  const pendingPromo = useRef<Track | null>(null);
   const promoPick = useQuery(
     anyApi.promotions.nextPromoted,
     promoDue ? { anonKey: anonKeyRef.current ?? undefined } : "skip",
@@ -798,7 +799,9 @@ function Shell() {
     promoSwipes.current = 0;
     if (!promoPick) return;
     promoEvery.current = promoPick.everyNCards;
-    injectNext({ ...toLocalCatalog(promoPick.track), promotedCampaignId: promoPick.campaignId });
+    const promoted = { ...toLocalCatalog(promoPick.track), promotedCampaignId: promoPick.campaignId };
+    pendingPromo.current = promoted;
+    injectNext(promoted);
     void recordPromoted({
       campaignId: promoPick.campaignId,
       anonKey: anonKeyRef.current ?? undefined,
@@ -811,6 +814,13 @@ function Shell() {
       setPromoDue(true);
     }
   }, [state.prefs.adsOptOut]);
+
+  // a rebuild behind the card on screen must not lose a paid song (src/lib/promoted.ts)
+  useEffect(() => {
+    const step = promotedFollowUp(state.queue.map((t) => t.id), pendingPromo.current?.id ?? null);
+    if (step === "clear") pendingPromo.current = null;
+    else if (step === "reinject" && pendingPromo.current) injectNext(pendingPromo.current);
+  }, [state.queue, injectNext]);
 
   const onDeck = state.queue[0] ?? null;
   const previousEntry = state.history.length
