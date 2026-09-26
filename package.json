@@ -14,6 +14,7 @@
     "convex": "^1.41.0",
     "expo": "~56.0.9",
     "expo-audio": "~56.0.11",
+    "expo-blur": "~56.0.4",
     "expo-font": "~56.0.5",
     "expo-haptics": "~56.0.3",
     "expo-linear-gradient": "~56.0.4",

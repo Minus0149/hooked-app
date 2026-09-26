@@ -375,7 +375,7 @@ export function Onboarding({
   return (
     <SafeAreaView ref={rootRef} style={styles.root} edges={["top", "bottom"]}>
       <Text style={styles.wordmark}>
-        hooked<Text style={{ color: colors.accentDefault }}>.</Text>
+        hookedcue<Text style={{ color: colors.accentDefault }}>.</Text>
       </Text>
 
       <View style={styles.stepArea}>

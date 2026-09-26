@@ -93,14 +93,14 @@ export function SoundPage({
       </Hint>
       {(
         [
-          ["allowRepeats", "Allow songs to reappear", "saved songs can come back around", "refresh-cw", colors.more],
-          ["includeBuried", "Deal buried songs", "songs you swiped left can return", "x", colors.never],
-          ["includeBlockedArtists", "Deal blocked artists", "artists you blocked can return", "x", colors.never],
+          ["allowRepeats", "Allow songs to reappear", "saved songs can come back around", "↻", colors.more],
+          ["includeBuried", "Deal buried songs", "songs you swiped left can return", "✕", colors.never],
+          ["includeBlockedArtists", "Deal blocked artists", "artists you blocked can return", "✕", colors.never],
         ] as const
       ).map(([key, label, sub, icon, iconColor]) => (
         <Row
           key={key}
-          icon={icon}
+          glyph={icon}
           iconColor={iconColor}
           label={label}
           sub={sub}
@@ -116,7 +116,7 @@ export function SoundPage({
         <>
           <GroupLabel>blocked artists</GroupLabel>
           <Row
-            icon="x"
+            glyph="✕"
             iconColor={colors.never}
             label={`Blocked artists (${state.neverArtists.length})`}
             sub="their songs never reach your deck"
@@ -127,8 +127,8 @@ export function SoundPage({
             state.neverArtists.slice(0, 50).map((a) => (
               <Row
                 key={a}
-                icon="more-horizontal"
-                iconColor={colors.muted}
+                glyph="·"
+                iconColor={colors.text}
                 label={a}
                 sub="blocked"
                 right={<RowValue color={colors.more}>unblock</RowValue>}

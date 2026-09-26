@@ -43,7 +43,7 @@ export function PlaybackPage({
   return (
     <SettingsPage title="Playback" sub="How songs behave in the deck." onBack={onBack}>
       <Row
-        icon="play"
+        glyph="▶"
         iconColor={colors.more}
         label="Auto-advance"
         sub="jump to the next song when a preview ends"
@@ -51,7 +51,7 @@ export function PlaybackPage({
         onPress={() => setAutoAdvance(!state.autoAdvance)}
       />
       <StaticRow
-        icon="music"
+        glyph="♪"
         label="Volume"
         sub={`${Math.round(volume * 100)}%`}
         right={
@@ -70,7 +70,7 @@ export function PlaybackPage({
         }
       />
       <Row
-        icon="heart"
+        glyph="♥"
         iconColor={colors.save}
         label="Swipe down saves to"
         sub={targetLabel}

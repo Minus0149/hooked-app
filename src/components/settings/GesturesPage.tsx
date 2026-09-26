@@ -18,7 +18,7 @@ export function GesturesPage({ onBack }: { onBack: () => void }) {
   return (
     <SettingsPage title="Gestures" sub="Tune the four swipes to your wrist." onBack={onBack}>
       <StaticRow
-        icon="move"
+        glyph="✥"
         iconColor={colors.save}
         label="Swipe distance"
         sub={s < 0.9 ? "feather-light flicks" : s > 1.1 ? "deliberate drags" : "the shipped default"}

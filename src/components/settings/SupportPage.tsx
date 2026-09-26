@@ -42,7 +42,7 @@ export function SupportPage({ onBack }: { onBack: () => void }) {
     const turnOff = await confirm({
       title: "Before you go…",
       body:
-        "hooked has no investors and no label money. Those few quiet cards between songs are what pay for the servers, the licences and the hours this takes. Turning them off won't cost you anything — but if a few hundred people do, this deck goes quiet with them.\n\nWhatever you choose, the music keeps playing. That's a promise.",
+        "hookedcue has no investors and no label money. Those few quiet cards between songs are what pay for the servers, the licences and the hours this takes. Turning them off won't cost you anything — but if a few hundred people do, this deck goes quiet with them.\n\nWhatever you choose, the music keeps playing. That's a promise.",
       cancelLabel: "Keep them on — I get it",
       confirmLabel: "Turn them off anyway",
       danger: true,
@@ -60,7 +60,7 @@ export function SupportPage({ onBack }: { onBack: () => void }) {
 
   return (
     <SettingsPage
-      title="Support hooked"
+      title="Support hookedcue"
       sub="The cards that keep the deck independent."
       onBack={onBack}
     >
@@ -74,7 +74,7 @@ export function SupportPage({ onBack }: { onBack: () => void }) {
         </Text>
         <Segmented<"on" | "off">
           options={[
-            { id: "on", label: "On — keep hooked independent" },
+            { id: "on", label: "On — keep hookedcue independent" },
             { id: "off", label: "Off" },
           ]}
           value={optedOut ? "off" : "on"}
@@ -97,7 +97,7 @@ export function SupportPage({ onBack }: { onBack: () => void }) {
             <Block
               label="Your own pace"
               style={styles.inner}
-              hint="pick a unit, set the number — the daily and weekly ceilings set by hooked always hold, and music never stops for a card"
+              hint="pick a unit, set the number — the daily and weekly ceilings set by hookedcue always hold, and music never stops for a card"
             >
               <Segmented
                 options={AD_UNITS}

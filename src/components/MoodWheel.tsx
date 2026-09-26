@@ -14,6 +14,7 @@ import type { Verdict } from "../data/predict";
 import { colors, fonts, withAlpha } from "../design/tokens";
 import { Face } from "./faces";
 import { useFaceIdle } from "./faceMotion";
+import { Backdrop } from "./Backdrop";
 
 /**
  * The mood ring — the mobile half of web/src/components/MoodWheel.tsx.
@@ -266,6 +267,8 @@ export function MoodWheel({
         exiting={FadeOut.duration(120)}
         style={styles.backdrop}
       >
+        {/* web .ring backdrop: rgba(3,3,5,.72) + blur(10px) */}
+        <Backdrop blurPx={10} dim={0.72} />
         {/* closes on touch-down, like the web's onPointerDown: a thumb that
             lands off the wheel means "not this", whether or not it then drags */}
         <Pressable style={StyleSheet.absoluteFill} onPressIn={onCancel} />
@@ -341,8 +344,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 30,
-    // dark enough that the faces, not the album art, are what the eye finds
-    backgroundColor: "rgba(3,3,5,0.72)",
+    // dark enough that the faces, not the album art, are what the eye finds:
+    // the tint and blur are drawn by <Backdrop> (rgba(3,3,5,.72) + 10px, as web)
   },
   // a point, not a box: everything is laid out around (0,0), the finger
   ring: { position: "absolute", width: 0, height: 0, zIndex: 31 },

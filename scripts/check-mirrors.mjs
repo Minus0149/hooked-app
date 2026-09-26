@@ -37,6 +37,7 @@ const MODULES = [
   "lib/accountDeletion.ts",
   "lib/tourCopy.ts",
   "lib/volume.ts",
+  "lib/backdrop.ts",
 ];
 
 try {

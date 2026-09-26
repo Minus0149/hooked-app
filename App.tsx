@@ -89,6 +89,8 @@ import {
   type Track,
 } from "./src/types";
 import { art } from "./src/lib/art";
+import { BlurTargetView } from "expo-blur";
+import { BlurTarget } from "./src/components/Backdrop";
 import { CONVEX_URL, SITE_URL, WEB_APP_URL } from "./src/config/env";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
@@ -246,6 +248,8 @@ function Shell() {
   const [fullSongOpen, setFullSongOpen] = useState(false);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const anonSwipeCount = useRef(0);
+  // what the overlays' frosted backdrop blurs on Android (see Backdrop)
+  const blurTarget = useRef<View>(null);
 
   useEffect(() => {
     void setAudioModeAsync({
@@ -1249,7 +1253,11 @@ function Shell() {
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
       {/* overlays that must cover the whole screen (the deck's mood wheel) */}
+      <BlurTarget.Provider value={blurTarget}>
       <PortalHost>
+      {/* Android blurs only what is inside a BlurTargetView: the screen is,
+          and every overlay below it (and the portal layer) is drawn after */}
+      <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       {screen === "home" && (
         <>
           <View style={styles.topbar}>
@@ -1266,7 +1274,7 @@ function Shell() {
               />
             </Pressable>
             <Text style={styles.wordmark}>
-              hooked<Text style={{ color: accent }}>.</Text>
+              hookedcue<Text style={{ color: accent }}>.</Text>
             </Text>
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
@@ -1309,7 +1317,7 @@ function Shell() {
               <Feather name="corner-up-left" size={18} color={colors.text} />
             </Pressable>
             <Text style={styles.wordmark}>
-              hooked<Text style={{ color: accent }}>.</Text>
+              hookedcue<Text style={{ color: accent }}>.</Text>
             </Text>
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
@@ -1444,6 +1452,8 @@ function Shell() {
         onHoldEnd={() => setPlusHolding(false)}
       />
 
+      </BlurTargetView>
+
       {plusRing && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <MoodWheel
@@ -1500,6 +1510,7 @@ function Shell() {
 
       <StatusBar style="light" />
       </PortalHost>
+      </BlurTarget.Provider>
     </SafeAreaView>
   );
 }

@@ -49,8 +49,35 @@ export function RowGroup({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The icon slot at a row's left: a text symbol when given one (what the web
+ * draws in .settings-row-icon, so the two apps show the same marks), else a
+ * Feather icon, else nothing.
+ */
+function RowIcon({
+  icon,
+  glyph,
+  color,
+}: {
+  icon?: keyof typeof Feather.glyphMap;
+  glyph?: string;
+  color?: string;
+}) {
+  if (!glyph && !icon) return null;
+  return (
+    <View style={styles.rowIcon}>
+      {glyph ? (
+        <Text style={[styles.rowGlyph, { color: color ?? colors.text }]}>{glyph}</Text>
+      ) : (
+        <Feather name={icon!} size={17} color={color ?? colors.text} />
+      )}
+    </View>
+  );
+}
+
 export function Row({
   icon,
+  glyph,
   iconColor,
   label,
   labelColor,
@@ -60,6 +87,8 @@ export function Row({
   onPress,
 }: {
   icon?: keyof typeof Feather.glyphMap;
+  /** a text symbol instead of an icon — web's settings rows use these (↓ ↻ § ✕ ♥ …) */
+  glyph?: string;
   iconColor?: string;
   label: string;
   labelColor?: string;
@@ -76,11 +105,7 @@ export function Row({
       accessibilityRole="button"
       accessibilityLabel={sub ? `${label}. ${sub}` : label}
     >
-      {icon && (
-        <View style={styles.rowIcon}>
-          <Feather name={icon} size={17} color={iconColor ?? colors.text} />
-        </View>
-      )}
+      <RowIcon icon={icon} glyph={glyph} color={iconColor} />
       <View style={styles.rowLabelWrap}>
         <Text style={[styles.rowLabel, labelColor != null && { color: labelColor }]}>
           {label}
@@ -138,12 +163,15 @@ export function GroupLabel({ children }: { children: ReactNode }) {
  */
 export function StaticRow({
   icon,
+  glyph,
   iconColor,
   label,
   sub,
   right,
 }: {
   icon?: keyof typeof Feather.glyphMap;
+  /** a text symbol instead of an icon — web's settings rows use these (↓ ↻ § ✕ ♥ …) */
+  glyph?: string;
   iconColor?: string;
   label: string;
   sub?: string;
@@ -151,11 +179,7 @@ export function StaticRow({
 }) {
   return (
     <View style={styles.row} accessibilityLabel={sub ? `${label}. ${sub}` : label}>
-      {icon && (
-        <View style={styles.rowIcon}>
-          <Feather name={icon} size={17} color={iconColor ?? colors.text} />
-        </View>
-      )}
+      <RowIcon icon={icon} glyph={glyph} color={iconColor} />
       <View style={styles.rowLabelWrap}>
         <Text style={styles.rowLabel}>{label}</Text>
         {sub ? <Text style={styles.rowSub}>{sub}</Text> : null}
@@ -243,6 +267,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   rowIcon: { width: 24, alignItems: "center" },
+  rowGlyph: { fontFamily: fonts.bodySemiBold, fontSize: 15, lineHeight: 19, textAlign: "center" },
   rowLabelWrap: { flex: 1, minWidth: 0, gap: 2 },
   rowLabel: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.text },
   rowSub: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },

@@ -206,7 +206,7 @@ export function AccessGate({
       <View style={s.form}>
         <Text style={s.kicker}>that was your {freeSwipes} free tastes</Text>
         <Text style={s.copy}>
-          hooked. is invite-only while it's in testing. leave your email and we'll let you in.
+          hookedcue is invite-only while it's in testing. leave your email and we'll let you in.
         </Text>
 
         <View style={s.field}>

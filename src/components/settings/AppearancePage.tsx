@@ -18,7 +18,7 @@ export function AppearancePage({ onBack }: { onBack: () => void }) {
   return (
     <SettingsPage
       title="Appearance"
-      sub="How hooked looks on this screen."
+      sub="How hookedcue looks on this screen."
       onBack={onBack}
     >
       <Block label="Accent">

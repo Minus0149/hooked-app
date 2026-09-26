@@ -50,7 +50,7 @@ export function DataPage({
     try {
       await Share.share({
         message: JSON.stringify(payload, null, 2),
-        title: "hooked-library.json",
+        title: "hookedcue-library.json",
       });
     } catch {
       // share sheet dismissed — nothing to do
@@ -67,11 +67,11 @@ export function DataPage({
   return (
     <SettingsPage
       title="Data & privacy"
-      sub="What hooked keeps about you, and what you can do about it."
+      sub="What hookedcue keeps about you, and what you can do about it."
       onBack={onBack}
     >
       <Row
-        icon="download"
+        glyph="↓"
         iconColor={colors.more}
         label="Export my library"
         sub="your lists and answers as JSON"
@@ -79,7 +79,7 @@ export function DataPage({
         onPress={() => void exportData()}
       />
       <Row
-        icon="globe"
+        glyph="↗"
         iconColor={colors.save}
         label="Use it on the web"
         sub={WEB_APP_URL.replace(/^https?:\/\//, "")}
@@ -87,20 +87,20 @@ export function DataPage({
         onPress={() => open(WEB_APP_URL, "the web app")}
       />
       <Row
-        icon="refresh-cw"
+        glyph="↻"
         label="Replay the swipe tutorial"
         sub="relearn the four gestures"
         onPress={onReplayTutorial}
       />
       <Row
-        icon="file-text"
+        glyph="§"
         label="Privacy & terms"
         sub="what we store, and how to get it deleted"
         right={<RowValue>open</RowValue>}
         onPress={() => open(`${SITE_URL}/privacy`, "the privacy policy")}
       />
       <Row
-        icon="x"
+        glyph="✕"
         iconColor={colors.never}
         label="Reset local data"
         labelColor={colors.never}
@@ -117,7 +117,7 @@ export function DataPage({
       />
       {signedIn && (
         <Row
-          icon="x"
+          glyph="✕"
           iconColor={colors.never}
           label="Delete my account"
           labelColor={colors.never}

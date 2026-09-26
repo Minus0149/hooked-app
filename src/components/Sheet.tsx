@@ -16,6 +16,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { colors, fonts } from "../design/tokens";
+import { Backdrop } from "./Backdrop";
 
 /**
  * Bottom sheet chrome shared by the save-target / new-playlist / full-song
@@ -65,6 +66,8 @@ export function Sheet({
       pointerEvents="box-none"
     >
       <Animated.View style={[styles.backdrop, backdropStyle]}>
+        {/* web .sheet-backdrop: rgba(3,3,5,.6) + blur(3px) */}
+        <Backdrop blurPx={3} dim={0.6} />
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={close}
@@ -85,7 +88,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.backdrop,
   },
   card: {
     position: "absolute",

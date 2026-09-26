@@ -71,7 +71,7 @@ export function ProfileScreen({
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
         <Text style={styles.wordmark}>
-          hooked<Text style={{ color: accent }}>.</Text>
+          hookedcue<Text style={{ color: accent }}>.</Text>
         </Text>
         <View style={{ width: 42, height: 42 }} />
       </View>
