@@ -1,17 +1,25 @@
+import { useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import type { Track } from "../types";
 import { colors, fonts } from "../design/tokens";
 import { Sheet, sheetText } from "./Sheet";
 import { appleMusicUrl, ITUNES_CREDIT, needsItunesCredit } from "../lib/attribution";
+import { REPORT_COPY } from "../lib/contentReport";
+import { ReportSong } from "./ReportSong";
 
 /** Links out to where the track can legally play in full — mirrors web. */
 export function FullSongSheet({
   track,
   onClose,
+  anonKey,
 }: {
   track: Track;
   onClose: () => void;
+  /** this install's anonymous key, so a guest's report is rate-limited too */
+  anonKey?: string | null;
 }) {
+  // "Report this song" turns this sheet into the report form (Play's UGC policy)
+  const [reporting, setReporting] = useState(false);
   const q = encodeURIComponent(`${track.title} ${track.artist}`);
   // the song itself on Apple Music when the preview is Apple's (lib/attribution)
   const services = [
@@ -22,7 +30,10 @@ export function FullSongSheet({
 
   return (
     <Sheet onClose={onClose}>
-      {(close) => (
+      {(close) =>
+        reporting ? (
+          <ReportSong track={track} anonKey={anonKey} onBack={() => setReporting(false)} onDone={close} />
+        ) : (
         <View>
           <Text style={sheetText.title}>Hear the whole thing</Text>
           <Text style={sheetText.sub}>
@@ -46,8 +57,12 @@ export function FullSongSheet({
           {needsItunesCredit(track) ? (
             <Text style={styles.credit}>preview {ITUNES_CREDIT}</Text>
           ) : null}
+          <Pressable onPress={() => setReporting(true)} accessibilityRole="button">
+            <Text style={styles.report}>{REPORT_COPY.link}</Text>
+          </Pressable>
         </View>
-      )}
+        )
+      }
     </Sheet>
   );
 }
@@ -80,4 +95,13 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   arrow: { fontSize: 15 },
+  // web .sheet-report
+  report: {
+    textAlign: "center",
+    fontSize: 12.5,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.muted,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
 });

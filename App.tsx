@@ -1506,7 +1506,7 @@ function Shell() {
       )}
 
       {fullSongOpen && onDeck && (
-        <FullSongSheet track={onDeck} onClose={() => setFullSongOpen(false)} />
+        <FullSongSheet track={onDeck} anonKey={anonKeyRef.current} onClose={() => setFullSongOpen(false)} />
       )}
 
       <StatusBar style="light" />
