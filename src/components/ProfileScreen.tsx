@@ -1,4 +1,3 @@
-import { emailLooksValid } from "../lib/accessApply";
 import { useMemo, useState } from "react";
 import {
   Image,
@@ -6,23 +5,23 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
-import { WEB_APP_URL } from "../config/env";
 import { authClient } from "../lib/auth-client";
 import { useStore } from "../state/store";
 import { colors, fonts, radii } from "../design/tokens";
 import { art } from "../lib/art";
+import { AuthForm } from "./AuthForm";
+import { AccessGate } from "./AccessGate";
 
 const ENTER = (i: number) => FadeInDown.duration(320).delay(i * 70);
 
 /**
- * Web's ProfileScreen, ported: signed out → email+password sign in / sign up
- * form; signed in → account header + the local taste dashboard (stats, top
- * genres, recent saves) and a sign-out button.
+ * Web's ProfileScreen, ported: signed out → sign in (or, from "Not in the beta
+ * yet? Apply", the beta application); signed in → account header + the local
+ * taste dashboard (stats, top genres, recent saves) and a sign-out button.
  */
 export function ProfileScreen({
   accent,
@@ -35,6 +34,8 @@ export function ProfileScreen({
 }) {
   const session = authClient.useSession();
   const { state } = useStore();
+  // "Not in the beta yet? Apply" swaps the sign-in form for the application
+  const [applying, setApplying] = useState(false);
   const { liked, discoveries, playlists, neverArtists } = state;
 
   const topGenres = useMemo(() => {
@@ -76,8 +77,19 @@ export function ProfileScreen({
         <View style={{ width: 42, height: 42 }} />
       </View>
 
-      {session.isPending ? null : !signedIn ? (
-        <AuthForm accent={accent} />
+      {session.isPending ? null : !signedIn && applying ? (
+        <AccessGate
+          inline
+          freeSwipes={0}
+          accent={accent}
+          intro={{
+            kicker: "join the beta",
+            copy: "hookedcue is invite-only while it's in testing. Leave your email and we'll send you an invite when you're in.",
+          }}
+          onSignIn={() => setApplying(false)}
+        />
+      ) : !signedIn ? (
+        <AuthForm accent={accent} onApply={() => setApplying(true)} />
       ) : (
         <ScrollView
           style={{ flex: 1 }}
@@ -184,189 +196,6 @@ export function ProfileScreen({
         </ScrollView>
       )}
     </View>
-  );
-}
-
-/**
- * Web's AuthForm, ported to RN TextInputs. `compact` drops the headline and
- * copy — the invite gate shows it under its own pitch, as the web gate does.
- */
-export function AuthForm({ accent, compact = false }: { accent: string; compact?: boolean }) {
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  const [resetting, setResetting] = useState(false);
-
-  // the button stays live, as on the web; what the browser's required and
-  // minLength checks say there is said inline here
-  const submit = async () => {
-    if (busy) return;
-    if (!emailLooksValid(email)) {
-      setError("that email doesn't look right");
-      return;
-    }
-    if (password.length < 8) {
-      setError("passwords are 8 characters or more");
-      return;
-    }
-    setError(null);
-    setBusy(true);
-    const result =
-      mode === "signup"
-        ? await authClient.signUp.email({
-            email: email.trim(),
-            password,
-            name: email.trim().split("@")[0],
-            // the confirmation link opens the web app; the phone rechecks on return
-            callbackURL: WEB_APP_URL,
-          })
-        : await authClient.signIn.email({ email: email.trim(), password });
-    setBusy(false);
-    if (result.error) {
-      setError(result.error.message ?? "Something went wrong");
-    }
-  };
-
-  // parity with web: the reset link lands in email and opens the web app,
-  // where the new password is set — then signing in here just works
-  const sendReset = async () => {
-    if (!email.trim() || resetting) return;
-    setResetting(true);
-    setError(null);
-    try {
-      const res = await authClient.requestPasswordReset({
-        email: email.trim(),
-        redirectTo: "https://app.hookedcue.com/#/",
-      });
-      if (res.error) throw new Error(res.error.message ?? "Couldn't send it");
-      setResetSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't send a reset link");
-    } finally {
-      setResetting(false);
-    }
-  };
-
-  const form = (
-      <Animated.View entering={ENTER(0)} style={{ gap: 16 }}>
-        {!compact && (
-          <>
-            <Text style={styles.authTitle}>
-              {mode === "signup" ? (
-                <>
-                  keep your taste{"\n"}
-                  <Text style={{ color: accent }}>forever</Text>
-                </>
-              ) : (
-                <>
-                  welcome <Text style={{ color: accent }}>back</Text>
-                </>
-              )}
-            </Text>
-            <Text style={styles.authCopy}>
-              {mode === "signup"
-                ? "Create an account and every swipe, like and playlist follows you across devices."
-                : "Sign in to pick up your library where you left it."}
-            </Text>
-          </>
-        )}
-
-        {/* 01 — identity */}
-        <View style={styles.cluster}>
-          <Text style={styles.clusterTitle}>email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.muted}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            autoComplete="email"
-            returnKeyType="next"
-          />
-          <Text style={styles.clusterHint}>
-            {mode === "signup"
-              ? "the email your library will follow across devices"
-              : resetSent
-                ? "reset link sent — check that inbox (and the promotions tab)"
-                : "the one you signed up with"}
-          </Text>
-        </View>
-
-        {/* 02 — the key */}
-        <View style={styles.cluster}>
-          <Text style={styles.clusterTitle}>password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={mode === "signup" ? "create a password (8+ characters)" : "your password"}
-            placeholderTextColor={colors.muted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            returnKeyType="go"
-            onSubmitEditing={() => void submit()}
-          />
-          {mode === "signup" && (
-            <Text style={styles.clusterHint}>hashed on our side — even we can't read it</Text>
-          )}
-          {mode === "signin" && !resetSent && (
-            <Pressable onPress={() => void sendReset()}>
-              <Text style={[styles.clusterHint, { color: accent, textDecorationLine: "underline" }]}>
-                {resetting ? "sending…" : "forgot it? send a reset link"}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-
-        {error && <Text style={styles.authError}>{error}</Text>}
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.primaryBtn,
-            busy && { opacity: 0.5 },
-            pressed && styles.pressed,
-          ]}
-          disabled={busy}
-          onPress={() => void submit()}
-        >
-          <Text style={styles.primaryBtnText}>
-            {busy ? "…" : mode === "signup" ? "Create account" : "Sign in"}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => pressed && { opacity: 0.7 }}
-          onPress={() => {
-            setError(null);
-            setMode(mode === "signup" ? "signin" : "signup");
-          }}
-        >
-          <Text style={styles.switchMode}>
-            {mode === "signup"
-              ? "Already have an account? Sign in"
-              : "New here? Create an account"}
-          </Text>
-        </Pressable>
-      </Animated.View>
-  );
-
-  // inside the gate's own scrolling card, a second scroll view would fight it
-  if (compact) return <View style={{ paddingTop: 8 }}>{form}</View>;
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.authBody}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      {form}
-    </ScrollView>
   );
 }
 
@@ -497,91 +326,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     fontSize: 13.5,
     color: colors.never,
-  },
-
-  // ----- auth form -----
-  // web .profile-body: the form sits in the middle of the screen, not the top
-  authBody: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-  // plain labelled fields — the numbered boxes-in-a-card read as a form
-  // within a form (mirrors web's .auth-field)
-  cluster: {
-    width: "100%",
-    alignSelf: "stretch",
-    gap: 7,
-  },
-  clusterTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11,
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-    color: colors.muted,
-  },
-  clusterHint: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 11.5,
-    color: colors.muted,
-  },
-  authTitle: {
-    fontFamily: fonts.display,
-    fontSize: 24,
-    lineHeight: 27,
-    letterSpacing: -0.7,
-    color: colors.text,
-    textAlign: "center",
-  },
-  authCopy: {
-    fontFamily: fonts.body,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.muted,
-    textAlign: "center",
-    maxWidth: 280,
-    alignSelf: "center",
-  },
-  input: {
-    width: "100%",
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface2,
-    color: colors.text,
-    fontFamily: fonts.body,
-    fontSize: 14.5,
-  },
-  authError: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13,
-    color: colors.never,
-  },
-  // web .ob-primary: the big light button, same as the tour's
-  primaryBtn: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 17,
-    borderRadius: 18,
-    backgroundColor: colors.text,
-  },
-  primaryBtnText: {
-    fontFamily: fonts.displayBold,
-    fontSize: 15,
-    color: colors.ink,
-  },
-  // web .ob-skip: a finger's worth of box around a quiet link
-  switchMode: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: 13.5,
-    color: colors.muted,
-    textAlign: "center",
-    paddingVertical: 14,
-    minHeight: 44,
   },
 });

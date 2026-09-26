@@ -48,6 +48,7 @@ import {
   moodAtPush,
   moodById,
   moodPlaylistName,
+  PLUS_DOWN_GAIN,
   type CrowdMoods,
   type MoodId,
 } from "./src/data/mood";
@@ -1448,7 +1449,7 @@ function Shell() {
           setPlusHolding(true);
           setPlusRing({ x, y });
         }}
-        onHoldMove={(dx, dy) => setPlusAim(moodAtPush(dx, dy, 38))}
+        onHoldMove={(dx, dy) => setPlusAim(moodAtPush(dx, dy, 38, PLUS_DOWN_GAIN))}
         onHoldEnd={() => setPlusHolding(false)}
       />
 

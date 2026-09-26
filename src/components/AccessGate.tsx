@@ -21,7 +21,7 @@ import {
 } from "../lib/accessApply";
 import { CONVEX_SITE_URL, WEB_APP_URL } from "../config/env";
 import { colors, fonts, mixHex, withAlpha } from "../design/tokens";
-import { AuthForm } from "./ProfileScreen";
+import { AuthForm, authStyles } from "./AuthForm";
 
 /**
  * The wall after the free swipes run out — the same application the web app
@@ -34,12 +34,22 @@ export function AccessGate({
   freeSwipes,
   accent,
   onClose,
+  inline = false,
+  intro,
+  onSignIn,
 }: {
   freeSwipes: number;
   accent: string;
-  onClose: () => void;
+  onClose?: () => void;
+  /** drawn in place (the profile screen's "Apply"), not as the overlay wall */
+  inline?: boolean;
+  /** a heading of its own, when it's opened on purpose rather than as the wall */
+  intro?: { kicker: string; copy: string };
+  /** where "already have an account? sign in" goes; without it the gate shows its own sign-in */
+  onSignIn?: () => void;
 }) {
   const [stage, setStage] = useState<Stage>("form");
+  const toSignIn = () => (onSignIn ? onSignIn() : setStage("signin"));
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [device, setDevice] = useState("");
@@ -106,8 +116,6 @@ export function AccessGate({
   if (stage === "signin") {
     body = (
       <View style={s.done}>
-        <Text style={s.kicker}>you're approved</Text>
-        <Text style={s.copy}>sign in and the deck never stops.</Text>
         <AuthForm accent={accent} compact />
       </View>
     );
@@ -120,10 +128,10 @@ export function AccessGate({
         <Text style={s.copy}>
           {rejected
             ? "this email isn't on the list for the current round. nothing else to do for now."
-            : "we'll email you when you're in. then create an account with this address and pick up right where you left off."}
+            : "we'll email you an invite when you're in — the link in it creates your account."}
         </Text>
-        <Pressable onPress={() => setStage("signin")}>
-          <Text style={s.close}>already approved? sign in</Text>
+        <Pressable onPress={toSignIn}>
+          <Text style={s.close}>already have an account? sign in</Text>
         </Pressable>
       </Animated.View>
     );
@@ -204,9 +212,10 @@ export function AccessGate({
   } else {
     body = (
       <View style={s.form}>
-        <Text style={s.kicker}>that was your {freeSwipes} free tastes</Text>
+        <Text style={s.kicker}>{intro?.kicker ?? `that was your ${freeSwipes} free tastes`}</Text>
         <Text style={s.copy}>
-          hookedcue is invite-only while it's in testing. leave your email and we'll let you in.
+          {intro?.copy ??
+            "hookedcue is invite-only while it's in testing. leave your email and we'll send you an invite."}
         </Text>
 
         <View style={s.field}>
@@ -256,11 +265,24 @@ export function AccessGate({
           >
             <Text style={s.primaryText}>{busy ? "sending…" : "put me on the list"}</Text>
           </Pressable>
-          <Pressable onPress={() => setStage("signin")}>
-            <Text style={s.close}>already approved? sign in</Text>
+          <Pressable onPress={toSignIn}>
+            <Text style={s.close}>already have an account? sign in</Text>
           </Pressable>
         </View>
       </View>
+    );
+  }
+
+  if (inline) {
+    return (
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={s.inlineBody}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {body}
+      </ScrollView>
     );
   }
 
@@ -276,9 +298,11 @@ export function AccessGate({
           showsVerticalScrollIndicator={false}
         >
           {body}
-          <Pressable onPress={onClose}>
-            <Text style={s.close}>not now — just looking</Text>
-          </Pressable>
+          {onClose && (
+            <Pressable onPress={onClose}>
+              <Text style={s.close}>not now — just looking</Text>
+            </Pressable>
+          )}
         </ScrollView>
       </Animated.View>
     </Animated.View>
@@ -375,7 +399,7 @@ function Field({
   return (
     <TextInput
       {...props}
-      style={[style, focused && { borderColor: withAlpha(accent, 0.7) }]}
+      style={[style, focused && { borderColor: "rgba(244,242,238,0.45)" }]}
       onFocus={(e) => {
         setFocused(true);
         props.onFocus?.(e);
@@ -486,16 +510,11 @@ const s = StyleSheet.create({
   pillDisabled: { opacity: 0.35 },
   pillText: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted },
   pillTextOn: { color: colors.ink, fontFamily: fonts.bodySemiBold },
-  error: { color: "#ff8080", fontSize: 12.5, fontFamily: fonts.body, marginTop: 2 },
+  error: { ...authStyles.errorText, ...authStyles.error, marginTop: 2 },
+  inlineBody: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 20 },
   actions: { marginTop: 8, gap: 2 },
-  primary: {
-    width: "100%",
-    paddingVertical: 17,
-    borderRadius: 18,
-    backgroundColor: colors.text,
-    alignItems: "center",
-  },
-  primaryText: { color: colors.ink, fontFamily: fonts.displayBold, fontSize: 15 },
+  primary: { ...authStyles.primary },
+  primaryText: authStyles.primaryText,
   dim: { opacity: 0.5 },
   pressed: { transform: [{ scale: 0.97 }] },
   close: {

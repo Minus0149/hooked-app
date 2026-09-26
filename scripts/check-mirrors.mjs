@@ -37,6 +37,7 @@ const MODULES = [
   "lib/accountDeletion.ts",
   "lib/tourCopy.ts",
   "lib/volume.ts",
+  "lib/authForms.ts",
   "lib/backdrop.ts",
   "lib/attribution.ts",
 ];

@@ -133,7 +133,7 @@ export function SettingsScreen({
             label="Creator dashboard"
             sub="put your own music in the deck"
             chevron
-            onPress={() => void Linking.openURL(`${WEB_APP_URL}/#/creator`).catch(() => undefined)}
+            onPress={() => void Linking.openURL(`${WEB_APP_URL}/creator`).catch(() => undefined)}
           />
           {canViewStats && (
             <Row
