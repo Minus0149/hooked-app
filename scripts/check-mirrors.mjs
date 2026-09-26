@@ -38,6 +38,7 @@ const MODULES = [
   "lib/tourCopy.ts",
   "lib/volume.ts",
   "lib/backdrop.ts",
+  "lib/attribution.ts",
 ];
 
 try {

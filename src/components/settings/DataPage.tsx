@@ -1,9 +1,10 @@
-import { Linking, Share } from "react-native";
+import { Linking, Share, StyleSheet, Text } from "react-native";
 import { useDialogs } from "../Dialogs";
 import { SettingsPage } from "./SettingsPage";
 import { Row, RowValue } from "./kit";
 import { useStore } from "../../state/store";
-import { colors } from "../../design/tokens";
+import { colors, fonts } from "../../design/tokens";
+import { APPLE_CREDIT_NOTE } from "../../lib/attribution";
 import { SITE_URL, WEB_APP_URL } from "../../config/env";
 
 /**
@@ -141,6 +142,22 @@ export function DataPage({
           }}
         />
       )}
+      {/* Apple's terms for its previews and artwork (lib/attribution.ts) */}
+      <Text style={styles.note}>{APPLE_CREDIT_NOTE}</Text>
     </SettingsPage>
   );
 }
+
+// matches the web's .settings-note: 12.5px, relaxed leading, muted
+const styles = StyleSheet.create({
+  note: {
+    fontFamily: fonts.body,
+    fontSize: 12.5,
+    lineHeight: 21,
+    color: colors.muted,
+    paddingTop: 4,
+    paddingHorizontal: 2,
+    paddingBottom: 10,
+    maxWidth: 340,
+  },
+});

@@ -50,6 +50,7 @@ import type { HapticsLevel, MotionLevel } from "../data/prefs";
 import { colors, fonts, gesture as GESTURE, radii } from "../design/tokens";
 import { DiscFX, type SaveFxData, type SaveRelease } from "./DiscFX";
 import { Eq } from "./Eq";
+import { ITUNES_CREDIT, needsItunesCredit } from "../lib/attribution";
 
 // a save only locks the deck briefly — the DiscFX overlay plays above while
 // the next card is already swipeable
@@ -682,6 +683,8 @@ export function SwipeDeck({
             {onDeck.artist}
           </Text>
         </View>
+        {/* Apple's condition for playing its previews (lib/attribution.ts) */}
+        {needsItunesCredit(onDeck) ? <Text style={styles.credit}>{ITUNES_CREDIT}</Text> : null}
       </View>
       <GestureDetector gesture={scrubPan}>
         <Animated.View
@@ -969,6 +972,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fonts.bodyMedium,
     color: colors.artistDim,
+  },
+  // web .card-credit: present, legible, quiet
+  credit: {
+    fontSize: 10.5,
+    fontFamily: fonts.bodyMedium,
+    letterSpacing: 0.2,
+    color: "rgba(244,242,238,0.5)",
+    marginTop: -2,
   },
   // scrubbable progress bar pinned to the card's bottom edge (web .scrub)
   scrub: {
