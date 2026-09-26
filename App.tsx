@@ -397,22 +397,15 @@ function Shell() {
     };
   }, [convex, session.data?.user?.id, profileStage, applyCrowdMoods, applyMoodPicks]);
 
-  const voteMood = useMutation(anyApi.moods.vote);
   /**
-   * A face was pressed on a card: steer this deck, and tell the catalogue.
+   * A face was picked on the ring: switch the deck to that mood.
    *
-   * The local half is instant and unconditional — the ranking is the visible
-   * answer to the gesture and must not wait on a network. The vote is
-   * best-effort: a guest has no profile to attach one to, and a failed vote is
-   * a lost data point, not a broken interaction.
+   * It is a mode switch, not a rating. It used to also vote that the song
+   * being held "felt like" the face, which read wrongly to people (they were
+   * choosing what to hear next, not judging this song) and wrote wrong data —
+   * pick "party" while a ballad is on screen and the ballad got a party vote.
    */
-  const pickMood = useCallback(
-    (mood: MoodId, trackId: string) => {
-      setMood(mood, trackId);
-      void voteMood({ trackId, mood }).catch(() => undefined);
-    },
-    [setMood, voteMood],
-  );
+  const pickMood = useCallback((mood: MoodId) => setMood(mood), [setMood]);
 
   /** The clock, when they asked it to decide rather than to offer. */
   const [daypart, setDaypart] = useState(() => daypartAt());
@@ -1351,7 +1344,7 @@ function Shell() {
             gateSwipe={gateSwipe}
             sensitivity={state.prefs.swipeSensitivity}
             activeMood={state.mood}
-            pickedMood={deckTrack ? state.moodPicks[deckTrack.id] ?? null : null}
+            pickedMood={null}
             verdict={deckVerdict}
             onPickMood={pickMood}
             onClearMood={() => setMood(null)}

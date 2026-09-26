@@ -233,7 +233,7 @@ export function MoodWheel({
   onCommit: (mood: MoodId) => void;
   onCancel: () => void;
   motionPref?: "full" | "reduced" | "off";
-  /** the line under everything; defaults to the card's "how does this one feel?" */
+  /** the line under everything; defaults to the card's "what are you in the mood for?" */
   hint?: string;
 }) {
   const reach = R_OUT + POP + EDGE;
@@ -326,7 +326,7 @@ export function MoodWheel({
             ? `${Math.round(verdict.chance * 100)}% your kind of thing${
                 verdict.reasons.length ? ` · ${verdict.reasons.join(", ")}` : ""
               }`
-            : (hint ?? "how does this one feel?")}
+            : (hint ?? "what are you in the mood for?")}
         </Text>
       </View>
     </>

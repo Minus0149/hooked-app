@@ -21,6 +21,7 @@ import {
   buildQueue,
   MODEL_PLACES,
   MOOD_PLACES,
+  moodQueue,
   rankPool,
   shuffle,
   keepOnScreen,
@@ -481,15 +482,10 @@ function reducer(state: AppState, action: Action): AppState {
           : state.moodPicks;
       if (mood === state.mood && moodPicks === state.moodPicks) return state;
       const next = { ...state, mood, moodSetAt: mood ? Date.now() : 0, moodPicks };
-      // Re-ranks behind the visible card, like a right-swipe: a face was
-      // pressed on purpose a moment ago, and a deck that didn't visibly answer
-      // would make the gesture look decorative.
-      const [head, ...rest] = state.queue;
-      if (!head) return next;
-      return {
-        ...next,
-        queue: spreadAlbums(uniqueById([head, ...rankPool(rest, steerOf(next))])),
-      };
+      // Picking a mood switches the deck; clearing it re-ranks behind the
+      // card on screen. The rules live in moodQueue (data/ranking.ts). Same as web.
+      if (!state.queue[0]) return next;
+      return { ...next, queue: moodQueue(state.queue, steerOf(next)) };
     }
 
     case "APPLY_CROWD_MOODS": {
