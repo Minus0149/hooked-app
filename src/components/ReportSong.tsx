@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "convex/react";
 import { anyApi } from "convex/server";
 import type { Track } from "../types";
@@ -75,8 +75,9 @@ export function ReportSong({
     );
   }
 
+  // the sheet caps its height; on a short phone the form scrolls inside it
   return (
-    <View style={{ gap: 12 }}>
+    <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 12 }} keyboardShouldPersistTaps="handled">
       <Text style={sheetText.title}>{REPORT_COPY.title}</Text>
       <Text style={sheetText.sub}>
         "{track.title}" — {track.artist}. {REPORT_COPY.sub}
@@ -131,7 +132,7 @@ export function ReportSong({
       <Pressable onPress={onBack} accessibilityRole="button">
         <Text style={s.back}>{REPORT_COPY.back}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
