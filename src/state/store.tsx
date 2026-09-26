@@ -29,6 +29,7 @@ import {
   uniqueById,
   type Steer,
 } from "../data/ranking";
+import { insertPromoted } from "../lib/promoted";
 import { coerceMood, type CrowdMoods, type MoodId } from "../data/mood";
 import { trainFromHistory, type TasteModel } from "../data/predict";
 import { SOUND_PLACES, soundTaste, type SoundTaste } from "../data/sound";
@@ -238,6 +239,8 @@ type Action =
   | { type: "SET_STRENGTHS"; mood: number; model: number }
   | { type: "BACK" }
   | { type: "JUMP_TO"; trackId: string }
+  // a paid, labelled song goes next in line (lib/promoted.ts)
+  | { type: "INJECT_NEXT"; track: Track }
   | { type: "SET_SAVE_TARGET"; target: SaveTarget }
   | { type: "SET_AUTO_ADVANCE"; value: boolean }
   | { type: "SET_REPLAY"; container: string; allow: boolean }
@@ -852,6 +855,13 @@ function reducer(state: AppState, action: Action): AppState {
     case "SET_AUTO_ADVANCE":
       return { ...state, autoAdvance: action.value };
 
+    case "INJECT_NEXT": {
+      if (state.neverTracks.includes(action.track.id) || state.neverArtists.includes(action.track.artist)) {
+        return state; // someone who buried a song or blocked an artist never gets it back as an ad
+      }
+      return { ...state, queue: insertPromoted(state.queue, action.track) };
+    }
+
     case "JUMP_TO": {
       const target =
         state.queue.find((t) => t.id === action.trackId) ??
@@ -873,6 +883,7 @@ interface StoreValue {
   swipe: (action: SwipeAction) => void;
   back: () => void;
   jumpTo: (trackId: string) => void;
+  injectNext: (track: Track) => void;
   setSaveTarget: (target: SaveTarget) => void;
   createPlaylist: (playlist: Playlist) => void;
   deletePlaylist: (id: string) => void;
@@ -998,6 +1009,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       swipe: (action: SwipeAction) => dispatch({ type: "SWIPE", action }),
       back: () => dispatch({ type: "BACK" }),
       jumpTo: (trackId: string) => dispatch({ type: "JUMP_TO", trackId }),
+      injectNext: (track: Track) => dispatch({ type: "INJECT_NEXT", track }),
       applyCatalog: (tracks: Track[]) => dispatch({ type: "APPLY_CATALOG", tracks }),
       applyAffinity: (scores: Record<string, number>, strength: number) =>
         dispatch({ type: "APPLY_AFFINITY", scores, strength }),

@@ -1,5 +1,4 @@
-﻿import { WEB_APP_URL } from "../config/env";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+﻿import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useStore } from "../state/store";
@@ -131,9 +130,11 @@ export function SettingsScreen({
             icon="mic"
             iconColor={colors.more}
             label="Creator dashboard"
-            sub="put your own music in the deck"
-            chevron
-            onPress={() => void Linking.openURL(`${WEB_APP_URL}/creator`).catch(() => undefined)}
+            // Deliberately not a link: the dashboard is where artists buy
+            // promotion, and Google Play forbids leading app users to a
+            // payment outside Play Billing (docs/PROMOTIONS.md). So the phone
+            // only says where it is.
+            sub="on the web, at app.hookedcue.com"
           />
           {canViewStats && (
             <Row

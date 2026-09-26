@@ -81,6 +81,7 @@ import { FullSongSheet } from "./src/components/FullSongSheet";
 import { UpdateBanner } from "./src/components/UpdateBanner";
 import { SponsoredCard, type AdCardData } from "./src/components/SponsoredCard";
 import { shouldAskForAd } from "./src/lib/ads-scheduler";
+import { PROMOTED_LISTEN_MS, promotedDue, promotedOutcome } from "./src/lib/promoted";
 import { colors, fonts, radii } from "./src/design/tokens";
 import {
   DIR_TO_ACTION,
@@ -207,6 +208,7 @@ function Shell() {
     swipe,
     back,
     jumpTo,
+    injectNext,
     setSaveTarget,
     createPlaylist,
     deletePlaylist,
@@ -776,6 +778,40 @@ function Shell() {
     [activeAd, recordAdEvent, signedIn, sessionUid],
   );
 
+  // ----- promoted songs: an artist paid for listeners (src/lib/promoted.ts) -----
+  // Same as web: ask every N swipes, the server owns the caps. The phone only
+  // ever shows the labelled card; it never links to buying promotion.
+  const recordPromoted = useMutation(anyApi.promotions.recordPromoted);
+  const promoSwipes = useRef(0);
+  const promoEvery = useRef(10);
+  const [promoDue, setPromoDue] = useState(false);
+  const promoPick = useQuery(
+    anyApi.promotions.nextPromoted,
+    promoDue ? { anonKey: anonKeyRef.current ?? undefined } : "skip",
+  ) as
+    | { campaignId: string; everyNCards: number; track: ServerCatalogTrack }
+    | null
+    | undefined;
+  useEffect(() => {
+    if (!promoDue || promoPick === undefined) return;
+    setPromoDue(false);
+    promoSwipes.current = 0;
+    if (!promoPick) return;
+    promoEvery.current = promoPick.everyNCards;
+    injectNext({ ...toLocalCatalog(promoPick.track), promotedCampaignId: promoPick.campaignId });
+    void recordPromoted({
+      campaignId: promoPick.campaignId,
+      anonKey: anonKeyRef.current ?? undefined,
+      event: "shown",
+    }).catch(() => undefined);
+  }, [promoDue, promoPick, injectNext, recordPromoted]);
+  const noteSwipeForPromoted = useCallback(() => {
+    promoSwipes.current += 1;
+    if (promotedDue({ swipesSince: promoSwipes.current, everyNCards: promoEvery.current, optedOut: state.prefs.adsOptOut })) {
+      setPromoDue(true);
+    }
+  }, [state.prefs.adsOptOut]);
+
   const onDeck = state.queue[0] ?? null;
   const previousEntry = state.history.length
     ? state.history[state.history.length - 1]
@@ -932,8 +968,16 @@ function Shell() {
     (dir: SwipeDir) => {
       lastSwipeAt.current = Date.now();
       noteSwipeForAds();
+      noteSwipeForPromoted();
       const track = onDeck;
       const action = DIR_TO_ACTION[dir];
+      if (track?.promotedCampaignId) {
+        void recordPromoted({
+          campaignId: track.promotedCampaignId,
+          anonKey: anonKeyRef.current ?? undefined,
+          event: promotedOutcome(dir),
+        }).catch(() => undefined);
+      }
       swipe(action);
       if (signedIn && track) {
         // credit the playing hook so save-rate ranking learns from mobile
@@ -949,8 +993,24 @@ function Shell() {
         );
       }
     },
-    [swipe, onDeck, signedIn, recordSwipeMutation, syncWrite, noteSwipeForAds],
+    [swipe, onDeck, signedIn, recordSwipeMutation, syncWrite, noteSwipeForAds, noteSwipeForPromoted, recordPromoted],
   );
+
+  // a promoted card counts as heard after 3 s of actual playing (as on web)
+  const promotedOnDeck = onDeck?.promotedCampaignId;
+  const promotedPlaying = status.playing;
+  useEffect(() => {
+    if (!promotedOnDeck || !promotedPlaying) return;
+    const t = setTimeout(() => {
+      void recordPromoted({
+        campaignId: promotedOnDeck,
+        anonKey: anonKeyRef.current ?? undefined,
+        event: "listen",
+        playedMs: PROMOTED_LISTEN_MS,
+      }).catch(() => undefined);
+    }, PROMOTED_LISTEN_MS);
+    return () => clearTimeout(t);
+  }, [promotedOnDeck, promotedPlaying, recordPromoted]);
 
   // bumping this cancels any in-flight save animation in the deck — going
   // back while the disc is still sliding in would otherwise show the same

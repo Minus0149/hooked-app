@@ -42,6 +42,7 @@ const MODULES = [
   "lib/backdrop.ts",
   "lib/attribution.ts",
   "lib/catalogCodec.ts",
+  "lib/promoted.ts",
 ];
 
 try {

@@ -95,14 +95,16 @@ export function Row({
   sub?: string;
   right?: ReactNode;
   chevron?: boolean;
-  onPress: () => void;
+  /** absent: an information row that isn't a button */
+  onPress?: () => void;
 }) {
   const grouped = useContext(InGroup);
   return (
     <Pressable
       style={({ pressed }) => [styles.row, grouped && styles.rowGrouped, pressed && { opacity: 0.8 }]}
       onPress={onPress}
-      accessibilityRole="button"
+      disabled={!onPress}
+      accessibilityRole={onPress ? "button" : "text"}
       accessibilityLabel={sub ? `${label}. ${sub}` : label}
     >
       <RowIcon icon={icon} glyph={glyph} color={iconColor} />

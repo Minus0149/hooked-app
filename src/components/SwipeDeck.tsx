@@ -51,6 +51,7 @@ import { colors, fonts, gesture as GESTURE, radii } from "../design/tokens";
 import { DiscFX, type SaveFxData, type SaveRelease } from "./DiscFX";
 import { Eq } from "./Eq";
 import { ITUNES_CREDIT, needsItunesCredit } from "../lib/attribution";
+import { PROMOTED_LABEL, PROMOTED_WHY } from "../lib/promoted";
 
 // a save only locks the deck briefly — the DiscFX overlay plays above while
 // the next card is already swipeable
@@ -664,6 +665,12 @@ export function SwipeDeck({
       </Animated.View>
 
       <View style={styles.meta}>
+        {onDeck.promotedCampaignId ? (
+          // paid content is marked on the card itself (ASCI), as on web
+          <View style={styles.promoted} accessibilityLabel={`${PROMOTED_LABEL}. ${PROMOTED_WHY}`}>
+            <Text style={styles.promotedText}>{PROMOTED_LABEL.toUpperCase()}</Text>
+          </View>
+        ) : null}
         <View style={[styles.genre, { backgroundColor: onDeck.accent }]}>
           <Text style={styles.genreText}>{onDeck.genre.toUpperCase()}</Text>
           {verdict?.worthShowing && verdict.chance >= 0.7 ? (
@@ -937,6 +944,22 @@ const styles = StyleSheet.create({
     right: 22,
     bottom: 20,
     gap: 6,
+  },
+  promoted: {
+    alignSelf: "flex-start",
+    marginBottom: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(8,8,12,0.55)",
+  },
+  promotedText: {
+    color: "#fff",
+    fontSize: 10.5,
+    fontFamily: fonts.bodyBold,
+    letterSpacing: 1.5,
   },
   genre: {
     alignSelf: "flex-start",
