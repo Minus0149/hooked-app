@@ -41,6 +41,7 @@ const MODULES = [
   "lib/contentReport.ts",
   "lib/backdrop.ts",
   "lib/attribution.ts",
+  "lib/catalogCodec.ts",
 ];
 
 try {

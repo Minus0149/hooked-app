@@ -93,6 +93,8 @@ import { art } from "./src/lib/art";
 import { BlurTargetView } from "expo-blur";
 import { BlurTarget } from "./src/components/Backdrop";
 import { CONVEX_URL, SITE_URL, WEB_APP_URL } from "./src/config/env";
+import { useCatalog } from "./src/lib/useCatalog";
+import type { CatalogTrack } from "./src/lib/catalogCodec";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
 const ANON_SWIPES_KEY = "hooked.anonSwipes.v1";
@@ -275,13 +277,6 @@ function Shell() {
     | ServerLibrary
     | null
     | undefined;
-  // The catalogue itself, not just the ids. Reading ids alone was why the app
-  // kept dealing its own bundled copies — hooks, creator uploads and imported
-  // songs all live server-side and never reached a card.
-  const serverTracks = useQuery(anyApi.tracks.list) as
-    | ServerCatalogTrack[]
-    | null
-    | undefined;
   const ensureProfile = useMutation(anyApi.library.ensureProfile);
   const recordSwipeMutation = useMutation(anyApi.library.recordSwipe);
   const revertSwipeMutation = useMutation(anyApi.library.revertSwipe);
@@ -437,13 +432,16 @@ function Shell() {
     return v;
   }, [model, sound, deckTrack, state.crowdMoods]);
 
-  useEffect(() => {
-    // An empty catalogue is a REAL state (admin hid everything) — honour it
-    // rather than dealing tracks the server buried.
-    if (serverTracks !== undefined && serverTracks !== null) {
-      applyCatalog(serverTracks.map(toLocalCatalog));
-    }
-  }, [serverTracks, applyCatalog]);
+  // The catalogue comes as a versioned file over HTTP, stored per version
+  // (src/lib/useCatalog.ts), not as a reactive query: as the first message on
+  // the websocket its 2 MB held up everything queued behind it. The catalogue
+  // itself, not just the ids — ids alone meant the app kept dealing its bundled
+  // copies. An empty catalogue is still a REAL state (admin hid everything).
+  const onCatalog = useCallback(
+    (tracks: CatalogTrack[]) => applyCatalog(tracks.map(toLocalCatalog)),
+    [applyCatalog],
+  );
+  useCatalog(onCatalog);
 
   /**
    * The write-ahead log. Failed mutations used to vanish; now they queue and
