@@ -82,6 +82,7 @@ export function useCatalog(onCatalog: (tracks: CatalogTrack[]) => void): void {
 
   const v = ver?.v;
   const parts = ver?.parts;
+  const cdn = ver?.cdn;
   useEffect(() => {
     if (v === undefined || parts === undefined) return;
     const run = async () => {
@@ -97,7 +98,7 @@ export function useCatalog(onCatalog: (tracks: CatalogTrack[]) => void): void {
       if (catalogAction(have.current, v) !== "fetch" || busy.current === v) return;
       busy.current = v;
       try {
-        const got = await fetchCatalog(CONVEX_SITE_URL, { v, parts }, (url, init) => fetch(url, init));
+        const got = await fetchCatalog(CONVEX_SITE_URL, { v, parts, ...(cdn ? { cdn } : {}) }, (url, init) => fetch(url, init));
         // the version decides, not timing: an older download finishing late
         // must never replace a newer catalogue
         if (have.current !== null && got.version <= have.current) return;
@@ -111,5 +112,5 @@ export function useCatalog(onCatalog: (tracks: CatalogTrack[]) => void): void {
       }
     };
     void run();
-  }, [v, parts]);
+  }, [v, parts, cdn]);
 }
