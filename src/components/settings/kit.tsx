@@ -8,7 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import { colors, fonts, radii } from "../../design/tokens";
-import { useT } from "../../lib/lang";
+import { useLang, useT } from "../../lib/lang";
 
 /** Plain-text children go through the translator; anything richer passes as is. */
 function useTx() {
@@ -168,7 +168,9 @@ export function Segmented<T extends string>({
 
 export function GroupLabel({ children }: { children: ReactNode }) {
   const tx = useTx();
-  return <Text style={styles.group}>{tx(children)}</Text>;
+  const { lang } = useLang();
+  // Devanagari splits apart when letter-spaced
+  return <Text style={[styles.group, lang === "hi" && styles.flat]}>{tx(children)}</Text>;
 }
 
 /**
@@ -228,9 +230,10 @@ export function Block({
   style?: object;
 }) {
   const tx = useTx();
+  const { lang } = useLang();
   return (
     <View style={[styles.block, style]}>
-      {label ? <Text style={styles.blockLabel}>{tx(label)}</Text> : null}
+      {label ? <Text style={[styles.blockLabel, lang === "hi" && styles.flat]}>{tx(label)}</Text> : null}
       {children}
       {hint ? <Text style={styles.blockHint}>{tx(hint)}</Text> : null}
     </View>
@@ -250,6 +253,7 @@ export function FieldLabel({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  flat: { letterSpacing: 0 },
   group: {
     fontFamily: fonts.bodyBold,
     fontSize: 11,

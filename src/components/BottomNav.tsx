@@ -62,6 +62,8 @@ function NavButton({
   accent: string;
   onPress: () => void;
 }) {
+  const tt = useT();
+  label = tt(label);
   return (
     <Pressable
       style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.8 }]}

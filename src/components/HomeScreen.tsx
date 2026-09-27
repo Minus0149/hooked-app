@@ -17,7 +17,7 @@ import { Face } from "./faces";
 import { RecapCard } from "./RecapCard";
 import { inkOn } from "../lib/contrast";
 import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodsForHour } from "../data/mood";
-import { useT } from "../lib/lang";
+import { useLang, useT } from "../lib/lang";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -55,7 +55,7 @@ function Mosaic({ tracks }: { tracks: Track[] }) {
 
 /** Today's personal pick (lib/hookOfDay.ts), same card as the web's .hotd. */
 function HookOfDayCard({ track, onPlay }: { track: Track; onPlay: (t: Track) => void }) {
-  const t = useT();
+  const { lang, t } = useLang();
   const onAccent = inkOn(track.accent);
   return (
     <Pressable
@@ -70,7 +70,7 @@ function HookOfDayCard({ track, onPlay }: { track: Track; onPlay: (t: Track) => 
     >
       <Image source={{ uri: art(track.artwork, 200) }} style={styles.hotdArt} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.hotdKicker, { color: track.accent }]}>{t("Hook of the day").toUpperCase()}</Text>
+        <Text style={[styles.hotdKicker, { color: track.accent }, lang === "hi" && { letterSpacing: 0 }]}>{t("Hook of the day").toUpperCase()}</Text>
         <Text style={styles.hotdTitle} numberOfLines={1}>
           {track.title}
         </Text>
@@ -118,7 +118,7 @@ export function HomeScreen({
   hookOfDay?: Track | null;
   onPlayHookOfDay?: (t: Track) => void;
 }) {
-  const t = useT();
+  const { lang, t } = useLang();
   const { state, setMood } = useStore();
   const { liked, discoveries, playlists, queue, boostGenres, catalog } = state;
 
@@ -184,7 +184,7 @@ export function HomeScreen({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.greeting}>{t(greeting())}</Text>
+      <Text style={[styles.greeting, lang === "hi" && { letterSpacing: 0 }]}>{t(greeting())}</Text>
       <Text style={styles.title}>
         {t("what's your next")} <Text style={{ color: accent }}>{t("obsession?")}</Text>
       </Text>

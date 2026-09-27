@@ -694,7 +694,7 @@ export function SwipeDeck({
           </Text>
         </View>
         {/* Apple's condition for playing its previews (lib/attribution.ts) */}
-        {needsItunesCredit(onDeck) ? <Text style={styles.credit}>{ITUNES_CREDIT}</Text> : null}
+        {needsItunesCredit(onDeck) ? <Text style={styles.credit}>{tt(ITUNES_CREDIT)}</Text> : null}
       </View>
       <GestureDetector gesture={scrubPan}>
         <Animated.View
