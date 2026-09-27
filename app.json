@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "hookedcue",
+    "name": "HookedCue",
     "slug": "hooked-music",
     "scheme": "hooked",
     "version": "1.0.3",
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.minus.hookedcue",
-      "versionCode": 4,
+      "versionCode": 5,
       "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#08080C",

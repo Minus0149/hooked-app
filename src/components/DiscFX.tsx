@@ -303,7 +303,7 @@ export function DiscFX({
             colors={["rgba(0,0,0,0.8)", "rgba(0,0,0,0)"]}
             style={styles.slotShadow}
           />
-          <Text style={styles.wordmark}>hookedcue.</Text>
+          <Text style={styles.wordmark}>HookedCue.</Text>
         </View>
         <Animated.View
           style={[styles.sticker, { backgroundColor: track.accent }, stickerStyle]}

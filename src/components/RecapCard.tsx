@@ -45,7 +45,7 @@ export function RecapCard() {
   });
 
   const share = () => {
-    Share.share({ message: `my week in hooks on hookedcue ${imageUrl}`, url: imageUrl, title: "my week in hooks" }).catch(
+    Share.share({ message: `my week in hooks on HookedCue ${imageUrl}`, url: imageUrl, title: "my week in hooks" }).catch(
       () => void Linking.openURL(imageUrl),
     );
   };

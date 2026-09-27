@@ -68,7 +68,7 @@ export function PlaybackPage({
       const ok = await confirm({
         title: t("Turn on notifications?"),
         body: t(
-          "hookedcue will send one notification a day with a song picked for you. Nothing else, and you can turn it off here any time.",
+          "HookedCue will send one notification a day with a song picked for you. Nothing else, and you can turn it off here any time.",
         ),
         confirmLabel: t("Turn on"),
         cancelLabel: t("Not now"),
@@ -77,7 +77,7 @@ export function PlaybackPage({
       if (!(await requestNotificationPermission())) {
         notify(
           t(
-            "Notifications are blocked for hookedcue. Allow them in your phone's settings to get your hook of the day.",
+            "Notifications are blocked for HookedCue. Allow them in your phone's settings to get your hook of the day.",
           ),
           "error",
         );

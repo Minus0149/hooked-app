@@ -17,7 +17,7 @@ import { useT } from "../lib/lang";
  * Sign in, or — with an invite — create the account. The web's AuthForm
  * (web/src/components/AuthForm.tsx), same words (lib/authForms.ts), same order.
  *
- * hookedcue is a beta you apply for, so this leads with signing in. Creating
+ * HookedCue is a beta you apply for, so this leads with signing in. Creating
  * an account is for invited emails only: the server refuses anyone else and
  * the form turns that refusal into an Apply button. `compact` drops the
  * headline — the invite gate shows it under its own pitch.

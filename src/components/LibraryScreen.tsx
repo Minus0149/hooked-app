@@ -377,7 +377,7 @@ export function LibraryScreen({
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
         <Text style={styles.wordmark}>
-          hookedcue<Text style={{ color: accent }}>.</Text>
+          HookedCue<Text style={{ color: accent }}>.</Text>
         </Text>
         {playlistId ? (
           <Pressable

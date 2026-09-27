@@ -68,7 +68,7 @@ export function DataPage({
   return (
     <SettingsPage
       title="Data & privacy"
-      sub="What hookedcue keeps about you, and what you can do about it."
+      sub="What HookedCue keeps about you, and what you can do about it."
       onBack={onBack}
     >
       <Row

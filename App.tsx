@@ -1479,7 +1479,7 @@ function Shell() {
               />
             </Pressable>
             <Text style={styles.wordmark}>
-              hookedcue<Text style={{ color: accent }}>.</Text>
+              HookedCue<Text style={{ color: accent }}>.</Text>
             </Text>
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
@@ -1534,7 +1534,7 @@ function Shell() {
               if (!state.session || !pos) {
                 return (
                   <Text style={styles.wordmark}>
-                    hookedcue<Text style={{ color: accent }}>.</Text>
+                    HookedCue<Text style={{ color: accent }}>.</Text>
                   </Text>
                 );
               }

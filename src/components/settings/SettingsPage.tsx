@@ -35,7 +35,7 @@ export function SettingsPage({
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
         <Text style={styles.wordmark}>
-          hookedcue<Text style={{ color: colors.accentDefault }}>.</Text>
+          HookedCue<Text style={{ color: colors.accentDefault }}>.</Text>
         </Text>
         <View style={{ width: 42, height: 42 }} />
       </View>

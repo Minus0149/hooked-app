@@ -49,7 +49,7 @@ export function SettingsScreen({
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
         <Text style={styles.wordmark}>
-          hookedcue<Text style={{ color: colors.accentDefault }}>.</Text>
+          HookedCue<Text style={{ color: colors.accentDefault }}>.</Text>
         </Text>
         <View style={{ width: 42, height: 42 }} />
       </View>
@@ -125,12 +125,12 @@ export function SettingsScreen({
         </RowGroup>
 
         {/* the same third card as the web: support, creators, and staff tools */}
-        <GroupLabel>hookedcue</GroupLabel>
+        <GroupLabel>HookedCue</GroupLabel>
         <RowGroup>
           <Row
             icon="heart"
             iconColor={state.prefs.adsOptOut ? colors.muted : colors.accentDefault}
-            label="Support hookedcue"
+            label="Support HookedCue"
             sub={state.prefs.adsOptOut ? "house ads off" : "house ads on"}
             chevron
             onPress={() => onOpen("support")}
@@ -157,7 +157,7 @@ export function SettingsScreen({
           )}
         </RowGroup>
         {/* which bundle this phone is running — was a faint line on the deck */}
-        <Text style={styles.foot}>hookedcue · {BUILD_TAG}</Text>
+        <Text style={styles.foot}>HookedCue · {BUILD_TAG}</Text>
       </Animated.ScrollView>
     </View>
   );

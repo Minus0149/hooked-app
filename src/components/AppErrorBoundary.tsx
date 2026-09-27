@@ -96,7 +96,7 @@ function ReportPanel({
 
   const shareReport = () => {
     void Share.share({
-      message: `hookedcue error report\n${payload.message}\n${payload.stack ?? ""}`,
+      message: `HookedCue error report\n${payload.message}\n${payload.stack ?? ""}`,
     }).catch(() => undefined);
   };
 

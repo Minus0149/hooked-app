@@ -75,7 +75,7 @@ export function ProfileScreen({
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
         <Text style={styles.wordmark}>
-          hookedcue<Text style={{ color: accent }}>.</Text>
+          HookedCue<Text style={{ color: accent }}>.</Text>
         </Text>
         <View style={{ width: 42, height: 42 }} />
       </View>
@@ -87,7 +87,7 @@ export function ProfileScreen({
           accent={accent}
           intro={{
             kicker: "join the beta",
-            copy: "hookedcue is invite-only while it's in testing. Leave your email and we'll send you an invite when you're in.",
+            copy: "HookedCue is invite-only while it's in testing. Leave your email and we'll send you an invite when you're in.",
           }}
           onSignIn={() => setApplying(false)}
         />

@@ -215,7 +215,7 @@ export function AccessGate({
         <Text style={s.kicker}>{intro?.kicker ?? `that was your ${freeSwipes} free tastes`}</Text>
         <Text style={s.copy}>
           {intro?.copy ??
-            "hookedcue is invite-only while it's in testing. leave your email and we'll send you an invite."}
+            "HookedCue is invite-only while it's in testing. leave your email and we'll send you an invite."}
         </Text>
 
         <View style={s.field}>

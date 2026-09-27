@@ -40,9 +40,9 @@ export function InviteCard() {
   const share = () => {
     if (!data.link) return;
     void Share.share({
-      message: `Come find songs with me on hookedcue — this link skips the waitlist. ${data.link}`,
+      message: `Come find songs with me on HookedCue — this link skips the waitlist. ${data.link}`,
       url: data.link,
-      title: "hookedcue",
+      title: "HookedCue",
     });
   };
 
