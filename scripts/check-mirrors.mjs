@@ -50,6 +50,7 @@ const MODULES = [
   "lib/i18n.ts",
   "lib/insightContext.ts",
   "lib/features.ts",
+  "lib/hookPlayback.ts",
 ];
 
 try {
