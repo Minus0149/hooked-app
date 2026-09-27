@@ -19,6 +19,16 @@ const NOTCH_R = 33; // notch circle radius
 const FILLET = 9; // shoulder radius — the "water droplet" outward swell
 const DIP = 5; // notch circle center sits this far below the bar's top edge
 const OVER = 12; // how far the droplet shoulders rise above the bar's edge
+const RISE = 24; // how far the + rises above the bar's edge
+/**
+ * Room above the bar for the + (and its shadow) and the droplet shoulders.
+ * On Android the whole screen sits in expo-blur's BlurTargetView, a plain
+ * FrameLayout — and a FrameLayout clips each child to its own bounds, so
+ * anything drawn above the bar was sliced off flat. The dock owns this room
+ * (transparent, touches pass through) and pulls itself up by the same amount,
+ * so the bar sits exactly where it did.
+ */
+export const DOCK_ROOM = RISE + 6;
 
 /**
  * Bar silhouette as one SVG path: the top edge SWELLS OUTWARD (upward)
@@ -149,7 +159,7 @@ export function BottomNav({
   };
 
   return (
-    <View style={styles.dock}>
+    <View style={styles.dock} collapsable={false} pointerEvents="box-none">
       <View style={styles.bar} onLayout={onBarLayout}>
         {dims && (
           <Svg
@@ -210,7 +220,9 @@ export function BottomNav({
 const styles = StyleSheet.create({
   dock: {
     marginHorizontal: 18,
-    marginTop: 6,
+    // 6 of real gap, as before; the rest is DOCK_ROOM, overlapping the screen
+    marginTop: 6 - DOCK_ROOM,
+    paddingTop: DOCK_ROOM,
     // root SafeAreaView already pads the bottom inset, so this lands at
     // safe-area + 14 like web's calc(14px + env(safe-area-inset-bottom))
     marginBottom: 14,
@@ -246,7 +258,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    top: -24,
+    top: -RISE,
     alignItems: "center",
   },
   fab: {
