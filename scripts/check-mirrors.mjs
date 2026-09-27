@@ -43,6 +43,7 @@ const MODULES = [
   "lib/attribution.ts",
   "lib/catalogCodec.ts",
   "lib/promoted.ts",
+  "lib/growth.ts",
 ];
 
 try {

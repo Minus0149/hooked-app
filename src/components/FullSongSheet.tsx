@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import type { Track } from "../types";
 import { colors, fonts } from "../design/tokens";
 import { Sheet, sheetText } from "./Sheet";
 import { appleMusicUrl, ITUNES_CREDIT, needsItunesCredit } from "../lib/attribution";
 import { REPORT_COPY } from "../lib/contentReport";
 import { ReportSong } from "./ReportSong";
+import { shareText, songShareUrl, songStoryUrl } from "../lib/growth";
 
 /** Links out to where the track can legally play in full — mirrors web. */
 export function FullSongSheet({
@@ -35,6 +36,22 @@ export function FullSongSheet({
           <ReportSong track={track} anonKey={anonKey} onBack={() => setReporting(false)} onDone={close} />
         ) : (
         <View>
+          {/* share a song at its hook — the Android share sheet, as on the web */}
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && { opacity: 0.8 }]}
+            accessibilityRole="button"
+            onPress={() => {
+              const url = songShareUrl(track.id);
+              void Share.share({ message: `${shareText(track.title, track.artist)} ${url}`, url, title: track.title });
+            }}
+          >
+            <Text style={[styles.note, { color: track.accent }]}>↗</Text>
+            <Text style={styles.name}>Share this song</Text>
+            <Text style={styles.shareSub}>opens at the hook</Text>
+          </Pressable>
+          <Pressable onPress={() => void Linking.openURL(songStoryUrl(track.id))} accessibilityRole="link">
+            <Text style={styles.story}>story image for Instagram</Text>
+          </Pressable>
           <Text style={sheetText.title}>Hear the whole thing</Text>
           <Text style={sheetText.sub}>
             "{track.title}" — {track.artist}. Previews stop at 30 seconds; pick
@@ -95,6 +112,17 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   arrow: { fontSize: 15 },
+  // web .sheet-share-sub / .sheet-share-story
+  shareSub: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.muted },
+  story: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: colors.muted,
+    textDecorationLine: "underline",
+    marginTop: -2,
+    marginBottom: 14,
+    marginLeft: 4,
+  },
   // web .sheet-report
   report: {
     textAlign: "center",

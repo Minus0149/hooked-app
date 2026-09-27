@@ -14,6 +14,7 @@ import { colors, fonts, mixHex, radii } from "../design/tokens";
 import { art } from "../lib/art";
 import { Eq } from "./Eq";
 import { Face } from "./faces";
+import { RecapCard } from "./RecapCard";
 import { inkOn } from "../lib/contrast";
 import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodsForHour } from "../data/mood";
 
@@ -242,6 +243,8 @@ export function HomeScreen({
       {state.prefs.moodByTime !== "off" ? (
         <Text style={styles.moodNudge}>{DAYPART_COPY[hour.part].nudge}</Text>
       ) : null}
+
+      <RecapCard />
 
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Your library</Text>

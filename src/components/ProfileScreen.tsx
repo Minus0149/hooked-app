@@ -15,6 +15,7 @@ import { colors, fonts, radii } from "../design/tokens";
 import { art } from "../lib/art";
 import { AuthForm } from "./AuthForm";
 import { AccessGate } from "./AccessGate";
+import { InviteCard } from "./InviteCard";
 
 const ENTER = (i: number) => FadeInDown.duration(320).delay(i * 70);
 
@@ -184,6 +185,10 @@ export function ProfileScreen({
               </Text>
             </Animated.View>
           )}
+
+          <Animated.View entering={ENTER(3)}>
+            <InviteCard />
+          </Animated.View>
 
           <Animated.View entering={ENTER(4)}>
             <Pressable
