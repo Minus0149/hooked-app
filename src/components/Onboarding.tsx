@@ -38,13 +38,14 @@ import { resolveDirWorklet } from "./SwipeDeck";
 import { MoodWheel, type HostRect } from "./MoodWheel";
 import { moodAtPush, moodById, type MoodId } from "../data/mood";
 import { colors, fonts, radii } from "../design/tokens";
+import { useT } from "../lib/lang";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const DEMO_W = Math.min(240, SCREEN_W * 0.6);
 
 interface GestureStep {
   dir: SwipeDir;
-  headline: ReactNode;
+  headline: TourHeadline;
   copy: string;
   color: string;
   arrow: string;
@@ -55,11 +56,7 @@ interface GestureStep {
 const GESTURE_STEPS: GestureStep[] = [
   {
     dir: "up",
-    headline: (
-      <>
-        not feeling it? <Text style={{ color: colors.accentDefault }}>swipe up</Text>
-      </>
-    ),
+    headline: { lead: "not feeling it?", accent: "swipe up" },
     copy: "Skips to the next song instantly. No hard feelings — we learn from it anyway.",
     color: "#FFFFFF",
     arrow: "↑",
@@ -67,11 +64,7 @@ const GESTURE_STEPS: GestureStep[] = [
   },
   {
     dir: "down",
-    headline: (
-      <>
-        love it? <Text style={{ color: colors.accentDefault }}>swipe down</Text>
-      </>
-    ),
+    headline: { lead: "love it?", accent: "swipe down" },
     copy: "Saves it to your Liked Songs or a playlist — you choose where in settings.",
     color: colors.save,
     arrow: "↓",
@@ -79,11 +72,7 @@ const GESTURE_STEPS: GestureStep[] = [
   },
   {
     dir: "right",
-    headline: (
-      <>
-        want more like it? <Text style={{ color: colors.accentDefault }}>swipe right</Text>
-      </>
-    ),
+    headline: { lead: "want more like it?", accent: "swipe right" },
     copy: "Doesn't save it — just tells the algorithm to chase this exact vibe.",
     color: colors.more,
     arrow: "→",
@@ -91,11 +80,7 @@ const GESTURE_STEPS: GestureStep[] = [
   },
   {
     dir: "left",
-    headline: (
-      <>
-        hate it? <Text style={{ color: colors.accentDefault }}>swipe left</Text>
-      </>
-    ),
+    headline: { lead: "hate it?", accent: "swipe left" },
     copy: "Never plays it again, and steers your feed far away from it.",
     color: colors.never,
     arrow: "←",
@@ -325,6 +310,7 @@ export function Onboarding({
   demoCatalog: Track[];
   onFinish: (taste: TastePrefs, mood: MoodId | null) => void;
 }) {
+  const tt = useT();
   // 0 = welcome, 1-3 = taste, 4-7 = the four swipes, 8 = the hold, 9 = done
   const [step, setStep] = useState(0);
   const [taste, setTaste] = useState<TastePrefs>(EMPTY_TASTE);
@@ -387,7 +373,7 @@ export function Onboarding({
             style={styles.stepWrap}
           >
             <Headline h={TOUR_COPY.welcome.headline} />
-            <Text style={styles.copy}>{TOUR_COPY.welcome.copy}</Text>
+            <Text style={styles.copy}>{tt(TOUR_COPY.welcome.copy)}</Text>
             <Eq color={colors.accentDefault} playing />
           </Animated.View>
         )}
@@ -410,7 +396,7 @@ export function Onboarding({
             />
             {step < 3 && (
               <Text style={styles.copy}>
-                {step === 1 ? TOUR_COPY.languages.copy : TOUR_COPY.genres.copy}
+                {tt(step === 1 ? TOUR_COPY.languages.copy : TOUR_COPY.genres.copy)}
               </Text>
             )}
             {step === 3 ? (
@@ -424,10 +410,10 @@ export function Onboarding({
                       onPress={() => setTaste((t) => ({ ...t, adventure: a.id }))}
                       accessibilityRole="radio"
                       accessibilityState={{ selected: on }}
-                      accessibilityLabel={`${a.label}. ${a.copy}`}
+                      accessibilityLabel={`${tt(a.label)}. ${tt(a.copy)}`}
                     >
-                      <Text style={styles.choiceLabel}>{a.label}</Text>
-                      <Text style={styles.choiceCopy}>{a.copy}</Text>
+                      <Text style={styles.choiceLabel}>{tt(a.label)}</Text>
+                      <Text style={styles.choiceCopy}>{tt(a.copy)}</Text>
                     </Pressable>
                   );
                 })}
@@ -444,10 +430,10 @@ export function Onboarding({
                       onPress={() => toggle(key, o.id)}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: on }}
-                      accessibilityLabel={o.label}
+                      accessibilityLabel={tt(o.label)}
                     >
                       <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                        {o.label}
+                        {tt(o.label)}
                       </Text>
                     </Pressable>
                   );
@@ -464,7 +450,7 @@ export function Onboarding({
             exiting={FadeOutUp.duration(180)}
             style={styles.stepWrap}
           >
-            <Text style={[styles.headline, styles.headlineSm]}>{gs.headline}</Text>
+            <Headline h={gs.headline} small />
             <View style={styles.demo}>
               <View style={[styles.arrowWrap, gs.arrowWrap]} pointerEvents="none">
                 <PulseArrow glyph={gs.arrow} color={gs.color} />
@@ -479,7 +465,7 @@ export function Onboarding({
                 />
               )}
             </View>
-            <Text style={styles.copy}>{gs.copy}</Text>
+            <Text style={styles.copy}>{tt(gs.copy)}</Text>
           </Animated.View>
         )}
 
@@ -491,7 +477,7 @@ export function Onboarding({
             style={styles.stepWrap}
           >
             <Text style={[styles.headline, styles.headlineSm]}>
-              and <Text style={{ color: colors.accentDefault }}>hold</Text>, then push
+              {tt("and")} <Text style={{ color: colors.accentDefault }}>{tt("hold")}</Text>{tt(", then push")}
             </Text>
             <View style={styles.demo}>
               {demoTracks.length > 0 ? (
@@ -505,8 +491,10 @@ export function Onboarding({
             </View>
             <Text style={styles.copy}>
               {mood
-                ? `Nice — we'll open with ${moodById(mood)?.label.toLowerCase()}. Hold any card to change it, any time.`
-                : TOUR_COPY.hold.copy}
+                ? tt("Nice — we'll open with {mood}. Hold any card to change it, any time.", {
+                    mood: tt(moodById(mood)?.label ?? "").toLowerCase(),
+                  })
+                : tt(TOUR_COPY.hold.copy)}
             </Text>
           </Animated.View>
         )}
@@ -518,11 +506,10 @@ export function Onboarding({
             style={styles.stepWrap}
           >
             <Text style={styles.headline}>
-              you're <Text style={{ color: colors.accentDefault }}>ready.</Text>
+              {tt("you're")} <Text style={{ color: colors.accentDefault }}>{tt("ready.")}</Text>
             </Text>
             <Text style={styles.copy}>
-              Four swipes and a hold. The ↩ button up top always brings back
-              the last song, in case you go too fast.
+              {tt("Four swipes and a hold. The ↩ button up top always brings back the last song, in case you go too fast.")}
             </Text>
           </Animated.View>
         )}
@@ -539,7 +526,7 @@ export function Onboarding({
           style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
           onPress={() => setStep(1)}
         >
-          <Text style={styles.primaryText}>{TOUR_COPY.start}</Text>
+          <Text style={styles.primaryText}>{tt(TOUR_COPY.start)}</Text>
         </Pressable>
       )}
       {step >= 1 && step <= TASTE_STEPS && (
@@ -548,7 +535,7 @@ export function Onboarding({
           style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
           onPress={() => setStep(step + 1)}
         >
-          <Text style={styles.primaryText}>{tasteStepButton(step, taste)}</Text>
+          <Text style={styles.primaryText}>{tt(tasteStepButton(step, taste))}</Text>
         </Pressable>
       )}
       {step > TASTE_STEPS && step < HOLD_STEP && (
@@ -559,7 +546,7 @@ export function Onboarding({
           // the button advance instead of dead-ending the tour
           onPress={() => setStep((s) => s + 1)}
         >
-          <Text style={styles.primaryText}>Swipe the card to continue</Text>
+          <Text style={styles.primaryText}>{tt("Swipe the card to continue")}</Text>
         </Pressable>
       )}
       {step === HOLD_STEP && (
@@ -573,7 +560,7 @@ export function Onboarding({
           onPress={() => setStep(LAST_STEP)}
         >
           <Text style={styles.primaryText}>
-            {mood || demoTracks.length === 0 ? "Next" : "Hold the card to continue"}
+            {tt(mood || demoTracks.length === 0 ? "Next" : "Hold the card to continue")}
           </Text>
         </Pressable>
       )}
@@ -582,13 +569,13 @@ export function Onboarding({
           style={({ pressed }) => [styles.primary, pressed && styles.primaryPressed]}
           onPress={finish}
         >
-          <Text style={styles.primaryText}>Start discovering</Text>
+          <Text style={styles.primaryText}>{tt("Start discovering")}</Text>
         </Pressable>
       )}
 
       {step < LAST_STEP ? (
         <Pressable style={styles.skip} hitSlop={8} onPress={finish}>
-          <Text style={styles.skipText}>{TOUR_COPY.skip}</Text>
+          <Text style={styles.skipText}>{tt(TOUR_COPY.skip)}</Text>
         </Pressable>
       ) : (
         <View style={styles.skip} />
@@ -626,9 +613,10 @@ const absFill = {
 
 /** A tour headline: the plain lead, then the accented end (web's <em>). */
 function Headline({ h, small = false }: { h: TourHeadline; small?: boolean }) {
+  const tt = useT();
   return (
     <Text style={[styles.headline, small && styles.headlineSm]}>
-      {h.lead} <Text style={{ color: colors.accentDefault }}>{h.accent}</Text>
+      {tt(h.lead)} <Text style={{ color: colors.accentDefault }}>{tt(h.accent)}</Text>
     </Text>
   );
 }

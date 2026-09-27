@@ -14,6 +14,7 @@ import {
   type ReportReason,
 } from "../lib/contentReport";
 
+import { useT } from "../lib/lang";
 /**
  * "Report this song", inside the full-song sheet (Google Play's UGC policy) —
  * the web's ReportSong, same words and order (lib/contentReport.ts). Works
@@ -30,6 +31,7 @@ export function ReportSong({
   onBack: () => void;
   onDone: () => void;
 }) {
+  const tt = useT();
   const submit = useMutation(anyApi.contentReports.submit);
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [note, setNote] = useState("");
@@ -66,10 +68,10 @@ export function ReportSong({
   if (sent) {
     return (
       <View style={{ gap: 12 }} accessibilityRole="summary">
-        <Text style={sheetText.title}>{REPORT_COPY.doneTitle}</Text>
-        <Text style={sheetText.sub}>{REPORT_COPY.doneSub}</Text>
+        <Text style={sheetText.title}>{tt(REPORT_COPY.doneTitle)}</Text>
+        <Text style={sheetText.sub}>{tt(REPORT_COPY.doneSub)}</Text>
         <Pressable style={authStyles.primary} onPress={onDone} accessibilityRole="button">
-          <Text style={authStyles.primaryText}>{REPORT_COPY.close}</Text>
+          <Text style={authStyles.primaryText}>{tt(REPORT_COPY.close)}</Text>
         </Pressable>
       </View>
     );
@@ -78,9 +80,9 @@ export function ReportSong({
   // the sheet caps its height; on a short phone the form scrolls inside it
   return (
     <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 12 }} keyboardShouldPersistTaps="handled">
-      <Text style={sheetText.title}>{REPORT_COPY.title}</Text>
+      <Text style={sheetText.title}>{tt(REPORT_COPY.title)}</Text>
       <Text style={sheetText.sub}>
-        "{track.title}" — {track.artist}. {REPORT_COPY.sub}
+        "{track.title}" — {track.artist}. {tt(REPORT_COPY.sub)}
       </Text>
       <View style={{ gap: 8 }} accessibilityRole="radiogroup">
         {REPORT_REASONS.map((r) => {
@@ -98,17 +100,17 @@ export function ReportSong({
             >
               <View style={[s.dot, on && s.dotOn]}>{on && <View style={s.dotFill} />}</View>
               <View style={{ flex: 1 }}>
-                <Text style={s.reasonLabel}>{r.label}</Text>
-                <Text style={s.reasonHint}>{r.hint}</Text>
+                <Text style={s.reasonLabel}>{tt(r.label)}</Text>
+                <Text style={s.reasonHint}>{tt(r.hint)}</Text>
               </View>
             </Pressable>
           );
         })}
       </View>
       <View style={{ gap: 7 }}>
-        <Text style={s.label}>{REPORT_COPY.noteLabel}</Text>
+        <Text style={s.label}>{tt(REPORT_COPY.noteLabel)}</Text>
         <Input
-          placeholder={REPORT_COPY.notePlaceholder}
+          placeholder={tt(REPORT_COPY.notePlaceholder)}
           value={note}
           onChangeText={setNote}
           maxLength={REPORT_NOTE_MAX}
@@ -130,7 +132,7 @@ export function ReportSong({
         <Text style={authStyles.primaryText}>{busy ? REPORT_COPY.busy : REPORT_COPY.submit}</Text>
       </Pressable>
       <Pressable onPress={onBack} accessibilityRole="button">
-        <Text style={s.back}>{REPORT_COPY.back}</Text>
+        <Text style={s.back}>{tt(REPORT_COPY.back)}</Text>
       </Pressable>
     </ScrollView>
   );

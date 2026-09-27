@@ -1,4 +1,4 @@
-﻿import { memo, useState } from "react";
+﻿import { memo, useCallback, useState } from "react";
 import {
   FlatList,
   Image,
@@ -19,6 +19,8 @@ import { colors, fonts, mixHex, radii, withAlpha } from "../design/tokens";
 import { art } from "../lib/art";
 import { useDialogs } from "./Dialogs";
 import { moodById } from "../data/mood";
+import { useT } from "../lib/lang";
+import { ExportSheet } from "./ExportSheet";
 
 function totalMinutes(tracks: Track[]) {
   // previews are ~30s each; show the full-song runtime for flavor
@@ -53,6 +55,7 @@ const TrackRow = memo(function TrackRow({
   onPlay: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
+  const tx = useT();
   return (
     <Animated.View
       entering={FadeInDown.delay(Math.min(i, 10) * 45)
@@ -87,7 +90,7 @@ const TrackRow = memo(function TrackRow({
         onPress={() => onRemove(t.id)}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={`remove ${t.title}`}
+        accessibilityLabel={tx("remove {title}", { title: t.title })}
       >
         <Feather name="x" size={15} color={colors.muted} />
       </Pressable>
@@ -105,7 +108,7 @@ export function LibraryScreen({
 }: {
   container: LibraryContainer;
   onBack: () => void;
-  onPlay: (trackId: string) => void;
+  onPlay: (session: { title: string; tracks: Track[]; shuffle: boolean; startId?: string }) => void;
   onRemove: (trackId: string) => void;
   onDeletePlaylist: (id: string) => void;
   onDiscoverInto: (container: LibraryContainer) => void;
@@ -114,6 +117,8 @@ export function LibraryScreen({
   const { state, updatePlaylistRules } = useStore();
   const updateRulesOnServer = useMutation(anyApi.library.updatePlaylistRules);
   const [showRules, setShowRules] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const tx = useT();
 
   let title: string;
   let tracks: Track[];
@@ -127,18 +132,18 @@ export function LibraryScreen({
   } | null = null;
 
   if (container === "liked") {
-    title = "Liked Songs";
+    title = tx("Liked Songs");
     tracks = state.liked;
     accent = colors.save;
     icon = "heart";
   } else if (container === "discoveries") {
-    title = "Discoveries";
+    title = tx("Discoveries");
     tracks = state.discoveries;
     accent = colors.more;
   } else {
     playlistId = container.slice(3);
     const pl = state.playlists.find((p) => p.id === playlistId);
-    title = pl?.name ?? "Playlist";
+    title = pl?.name ?? tx("playlist");
     tracks = pl?.tracks ?? [];
     accent = pl?.accent ?? accent;
     rules = {
@@ -149,13 +154,17 @@ export function LibraryScreen({
   }
 
   const collage = tracks.slice(0, 4);
+  const playFrom = useCallback(
+    (id: string) => onPlay({ title, tracks, shuffle: false, startId: id }),
+    [onPlay, title, tracks],
+  );
   const isSaveTarget = state.saveTarget === container;
 
   const confirmDelete = async () => {
     const ok = await confirm({
-      title: `Delete “${title}”?`,
-      body: "The songs in it leave your library too.",
-      confirmLabel: "Delete playlist",
+      title: tx("Delete “{title}”?", { title }),
+      body: tx("The songs in it leave your library too."),
+      confirmLabel: tx("Delete playlist"),
       danger: true,
     });
     if (!ok) return;
@@ -195,17 +204,17 @@ export function LibraryScreen({
             {playlistId
               ? (() => {
                   const m = moodById(state.playlists.find((p) => p.id === playlistId)?.mood);
-                  return m ? `${m.label.toUpperCase()} PLAYLIST` : "PLAYLIST";
+                  return (m ? `${tx(m.label)} ${tx("playlist")}` : tx("playlist")).toUpperCase();
                 })()
-              : "COLLECTION"}
+              : tx("collection").toUpperCase()}
             {isSaveTarget && (
-              <Text style={{ color: colors.save }}> · saving here</Text>
+              <Text style={{ color: colors.save }}> · {tx("saving here")}</Text>
             )}
           </Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.sub}>
-            {tracks.length} {tracks.length === 1 ? "song" : "songs"}
-            {tracks.length > 0 && ` · ~${totalMinutes(tracks)} min of music`}
+            {tx(tracks.length === 1 ? "{n} song" : "{n} songs", { n: tracks.length })}
+            {tracks.length > 0 && ` · ${tx("~{m} min of music", { m: totalMinutes(tracks) })}`}
           </Text>
         </View>
       </View>
@@ -219,10 +228,26 @@ export function LibraryScreen({
             tracks.length === 0 && { opacity: 0.35 },
             pressed && { transform: [{ scale: 0.96 }] },
           ]}
-          onPress={() => tracks[0] && onPlay(tracks[0].id)}
+          onPress={() => tracks[0] && onPlay({ title, tracks, shuffle: false })}
+          accessibilityRole="button"
         >
           <Feather name="play" size={13} color={colors.ink} />
-          <Text style={styles.ctaText}>Play</Text>
+          <Text style={styles.ctaText}>{tx("Play")}</Text>
+        </Pressable>
+        <Pressable
+          disabled={tracks.length < 2}
+          style={({ pressed }) => [
+            styles.cta,
+            styles.ctaGhost,
+            { borderColor: mixHex(accent, colors.line, 0.45) },
+            tracks.length < 2 && { opacity: 0.35 },
+            pressed && { transform: [{ scale: 0.96 }] },
+          ]}
+          onPress={() => onPlay({ title, tracks, shuffle: true })}
+          accessibilityRole="button"
+        >
+          <Feather name="shuffle" size={13} color={colors.text} />
+          <Text style={[styles.ctaText, { color: colors.text }]}>{tx("Shuffle")}</Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [
@@ -235,8 +260,23 @@ export function LibraryScreen({
         >
           <Sparkle size={14} color={colors.text} />
           <Text style={[styles.ctaText, { color: colors.text }]}>
-            Discover into this
+            {tx("Discover into this")}
           </Text>
+        </Pressable>
+        <Pressable
+          disabled={tracks.length === 0}
+          style={({ pressed }) => [
+            styles.cta,
+            styles.ctaGhost,
+            { borderColor: mixHex(accent, colors.line, 0.45) },
+            tracks.length === 0 && { opacity: 0.35 },
+            pressed && { transform: [{ scale: 0.96 }] },
+          ]}
+          onPress={() => setExporting(true)}
+          accessibilityRole="button"
+        >
+          <Feather name="share" size={13} color={colors.text} />
+          <Text style={[styles.ctaText, { color: colors.text }]}>{tx("Export")}</Text>
         </Pressable>
       </View>
 
@@ -246,20 +286,22 @@ export function LibraryScreen({
             style={styles.rulesRow}
             onPress={() => setShowRules((v) => !v)}
             accessibilityRole="button"
-            accessibilityLabel="discovery rules"
+            accessibilityLabel={tx("Discovery rules")}
           >
             <Feather name="settings" size={14} color={accent} />
             <Text style={styles.rulesLabel}>
-              Discovery rules ·{" "}
+              {tx("Discovery rules")} ·{" "}
               {rules.allowRepeats || rules.includeBuried || rules.includeBlockedArtists
-                ? [
-                    rules.allowRepeats && "repeats",
-                    rules.includeBuried && "buried",
-                    rules.includeBlockedArtists && "blocked",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") + " allowed"
-                : "strict"}
+                ? tx("{list} allowed", {
+                    list: [
+                      rules.allowRepeats && tx("repeats"),
+                      rules.includeBuried && tx("buried"),
+                      rules.includeBlockedArtists && tx("blocked"),
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                  })
+                : tx("strict")}
             </Text>
             <Feather name={showRules ? "chevron-up" : "chevron-down"} size={14} color={colors.muted} />
           </Pressable>
@@ -285,8 +327,8 @@ export function LibraryScreen({
                 accessibilityState={{ selected: rules[key] }}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.ruleTitle}>{label}</Text>
-                  <Text style={styles.ruleSub}>{sub}</Text>
+                  <Text style={styles.ruleTitle}>{tx(label)}</Text>
+                  <Text style={styles.ruleSub}>{tx(sub)}</Text>
                 </View>
                 <View style={[styles.toggle, rules[key] && styles.toggleOn]}>
                   <View style={[styles.knob, rules[key] && styles.knobOn]} />
@@ -295,7 +337,7 @@ export function LibraryScreen({
             ))}
           {showRules && (
             <Text style={styles.rulesNote}>
-              Applies while this playlist is your swipe-down target.
+              {tx("Applies while this playlist is your swipe-down target.")}
             </Text>
           )}
         </>
@@ -307,11 +349,9 @@ export function LibraryScreen({
           style={styles.empty}
         >
           <Text style={styles.emptyText}>
-            Nothing in here yet. Hit{" "}
-            <Text style={{ color: accent, fontFamily: fonts.bodyBold }}>
-              Discover into this
-            </Text>{" "}
-            — every song you swipe down will land right here.
+            {tx(
+              "Nothing in here yet. Hit Discover into this — every song you swipe down will land right here.",
+            )}
           </Text>
         </Animated.View>
       )}
@@ -332,7 +372,7 @@ export function LibraryScreen({
           style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
           onPress={onBack}
           accessibilityRole="button"
-          accessibilityLabel="back"
+          accessibilityLabel={tx("back")}
         >
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
@@ -344,7 +384,7 @@ export function LibraryScreen({
             style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
             onPress={confirmDelete}
             accessibilityRole="button"
-            accessibilityLabel="delete playlist"
+            accessibilityLabel={tx("Delete playlist")}
           >
             <Feather name="x" size={18} color={colors.never} />
           </Pressable>
@@ -359,7 +399,7 @@ export function LibraryScreen({
         keyExtractor={(t) => t.id}
         ListHeaderComponent={header}
         renderItem={({ item, index }) => (
-          <TrackRow t={item} i={index} accent={accent} onPlay={onPlay} onRemove={onRemove} />
+          <TrackRow t={item} i={index} accent={accent} onPlay={playFrom} onRemove={onRemove} />
         )}
         initialNumToRender={12}
         maxToRenderPerBatch={12}
@@ -368,6 +408,9 @@ export function LibraryScreen({
         showsVerticalScrollIndicator={false}
       />
       <View style={{ height: 10 }} />
+      {exporting && (
+        <ExportSheet title={title} tracks={tracks} accent={accent} onClose={() => setExporting(false)} />
+      )}
     </View>
   );
 }
@@ -491,13 +534,14 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   sub: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },
-  ctas: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  ctas: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 },
   cta: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: "40%",
     paddingVertical: 11,
     borderRadius: 999,
   },

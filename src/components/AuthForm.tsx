@@ -12,6 +12,7 @@ import {
 } from "../lib/authForms";
 import { colors, fonts } from "../design/tokens";
 
+import { useT } from "../lib/lang";
 /**
  * Sign in, or — with an invite — create the account. The web's AuthForm
  * (web/src/components/AuthForm.tsx), same words (lib/authForms.ts), same order.
@@ -35,6 +36,7 @@ export function AuthForm({
   /** open the beta application */
   onApply?: () => void;
 }) {
+  const tt = useT();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
@@ -118,16 +120,16 @@ export function AuthForm({
       {!compact && (
         <>
           <Text style={s.title}>
-            {copy.title.lead} <Text style={{ color: accent }}>{copy.title.accent}</Text>
+            {tt(copy.title.lead)} <Text style={{ color: accent }}>{tt(copy.title.accent)}</Text>
           </Text>
-          <Text style={s.copy}>{copy.copy}</Text>
+          <Text style={s.copy}>{tt(copy.copy)}</Text>
         </>
       )}
 
       <View style={s.field}>
-        <Text style={s.label}>{AUTH_COPY.emailLabel}</Text>
+        <Text style={s.label}>{tt(AUTH_COPY.emailLabel)}</Text>
         <Input
-          placeholder={AUTH_COPY.emailPlaceholder}
+          placeholder={tt(AUTH_COPY.emailPlaceholder)}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -140,7 +142,7 @@ export function AuthForm({
 
       <View style={s.field}>
         <View style={s.labelRow}>
-          <Text style={s.label}>{AUTH_COPY.passwordLabel}</Text>
+          <Text style={s.label}>{tt(AUTH_COPY.passwordLabel)}</Text>
           {mode === "signin" && (
             <Pressable onPress={() => void sendReset()} hitSlop={10} accessibilityRole="button">
               <Text style={s.link}>{resetting ? "Sending…" : AUTH_COPY.forgot}</Text>
@@ -172,7 +174,7 @@ export function AuthForm({
 
       {resetSent && !error && (
         <View style={s.note} accessibilityRole="summary">
-          <Text style={s.noteText}>{AUTH_COPY.resetSent}</Text>
+          <Text style={s.noteText}>{tt(AUTH_COPY.resetSent)}</Text>
         </View>
       )}
       {error && (
@@ -204,16 +206,16 @@ export function AuthForm({
                 onPress={onApply}
                 accessibilityRole="button"
               >
-                <Text style={s.secondaryText}>{AUTH_COPY.apply}</Text>
+                <Text style={s.secondaryText}>{tt(AUTH_COPY.apply)}</Text>
               </Pressable>
             )}
             <Pressable onPress={() => switchMode("join")} accessibilityRole="button">
-              <Text style={s.switchMode}>{AUTH_COPY.haveInvite}</Text>
+              <Text style={s.switchMode}>{tt(AUTH_COPY.haveInvite)}</Text>
             </Pressable>
           </>
         ) : (
           <Pressable onPress={() => switchMode("signin")} accessibilityRole="button">
-            <Text style={s.switchMode}>{AUTH_COPY.haveAccount}</Text>
+            <Text style={s.switchMode}>{tt(AUTH_COPY.haveAccount)}</Text>
           </Pressable>
         )}
       </View>

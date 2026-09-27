@@ -5,6 +5,7 @@ import { useStore } from "../state/store";
 import { colors, fonts, radii } from "../design/tokens";
 import { GroupLabel, Row, RowGroup } from "./settings/kit";
 import { BUILD_TAG } from "../buildInfo";
+import { useLang } from "../lib/lang";
 
 /**
  * Settings is a hub now, not one long column: five sections lead to their own
@@ -24,13 +25,14 @@ export function SettingsScreen({
   onOpenProfile: () => void;
   /** the signed-in account's address, when there is one */
   email?: string | null;
-  onOpen: (page: "appearance" | "playback" | "gestures" | "sound" | "data" | "support") => void;
+  onOpen: (page: "appearance" | "playback" | "gestures" | "sound" | "data" | "support" | "language") => void;
   onOpenStats: () => void;
   signedIn: boolean;
   /** admin or approved creator — reveals the Analytics row */
   canViewStats?: boolean;
 }) {
   const { state } = useStore();
+  const { setting, t } = useLang();
 
   const motionLabel =
     state.prefs.motion === "full" ? "Full" : state.prefs.motion === "reduced" ? "Reduced" : "Off";
@@ -42,7 +44,7 @@ export function SettingsScreen({
           style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
           onPress={onBack}
           accessibilityRole="button"
-          accessibilityLabel="back"
+          accessibilityLabel={t("back")}
         >
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
@@ -58,7 +60,7 @@ export function SettingsScreen({
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Settings</Text>
+        <Text style={styles.title}>{t("Settings")}</Text>
 
         {/* three short cards — the same groups, order and icons as web */}
         <GroupLabel>listening</GroupLabel>
@@ -67,7 +69,7 @@ export function SettingsScreen({
             icon="play"
             iconColor={colors.more}
             label="Playback"
-            sub={`auto-advance ${state.autoAdvance ? "on" : "off"} · save target`}
+            sub={state.autoAdvance ? "auto-advance on · save target" : "auto-advance off · save target"}
             chevron
             onPress={() => onOpen("playback")}
           />
@@ -75,7 +77,7 @@ export function SettingsScreen({
             icon="move"
             iconColor={colors.save}
             label="Gestures"
-            sub={`swipe distance · haptics ${state.prefs.haptics}`}
+            sub={t("swipe distance · haptics {h}", { h: t(state.prefs.haptics) })}
             chevron
             onPress={() => onOpen("gestures")}
           />
@@ -102,9 +104,16 @@ export function SettingsScreen({
             icon="droplet"
             iconColor={state.prefs.accentMode === "custom" ? state.prefs.accentColor : colors.accentDefault}
             label="Appearance"
-            sub={`accent · motion ${motionLabel.toLowerCase()}`}
+            sub={t("accent · motion {m}", { m: t(motionLabel.toLowerCase()) })}
             chevron
             onPress={() => onOpen("appearance")}
+          />
+          <Row
+            glyph="अ"
+            label="App language"
+            sub={setting === "auto" ? "Follow my phone" : setting === "hi" ? "हिन्दी" : "English"}
+            chevron
+            onPress={() => onOpen("language")}
           />
           <Row
             icon="shield"

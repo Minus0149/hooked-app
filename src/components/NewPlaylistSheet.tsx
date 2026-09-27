@@ -7,6 +7,7 @@ import { nameAfterMoodPick } from "../lib/playlistMood";
 import { Face } from "./faces";
 import { Sheet, sheetText } from "./Sheet";
 
+import { useT } from "../lib/lang";
 /**
  * FAB flow — pick a mood (or Any), name the playlist, pick its accent, and
  * start saving into it; the discovery rules fold away under "more options".
@@ -37,6 +38,7 @@ export function NewPlaylistSheet({
   onCreate: (name: string, accent: string, rules?: PlaylistRules, mood?: MoodId | null) => void;
   onClose: () => void;
 }) {
+  const tt = useT();
   const [name, setName] = useState("");
   const [focused, setFocused] = useState(false);
   const [accent, setAccent] = useState(PLAYLIST_SWATCHES[1]);
@@ -71,14 +73,16 @@ export function NewPlaylistSheet({
         };
         return (
           <View>
-            <Text style={sheetText.title}>New playlist</Text>
+            <Text style={sheetText.title}>{tt("New playlist")}</Text>
             <Text style={sheetText.sub}>
               {mood
-                ? `Swipe down to save here. The deck leans ${moodById(mood)?.label.toLowerCase()} while you fill it.`
-                : "Every song you swipe down is saved here until you pick another."}
+                ? tt("Swipe down to save here. The deck leans {mood} while you fill it.", {
+                    mood: tt(moodById(mood)?.label ?? "").toLowerCase(),
+                  })
+                : tt("Every song you swipe down is saved here until you pick another.")}
             </Text>
 
-            <Text style={styles.rulesLabel}>mood</Text>
+            <Text style={styles.rulesLabel}>{tt("mood")}</Text>
             <View style={styles.moods} accessibilityRole="radiogroup">
               {[null, ...MOODS.map((m) => m.id)].map((id) => {
                 const m = id ? moodById(id) : null;
@@ -91,7 +95,7 @@ export function NewPlaylistSheet({
                     onPress={() => pickMood(id)}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
-                    accessibilityLabel={m ? `${m.label} — ${m.line}` : "Any mood"}
+                    accessibilityLabel={m ? `${tt(m.label)} — ${tt(m.line)}` : "Any mood"}
                   >
                     <View
                       style={[
@@ -114,14 +118,14 @@ export function NewPlaylistSheet({
               })}
             </View>
 
-            <Text style={styles.rulesLabel}>name</Text>
+            <Text style={styles.rulesLabel}>{tt("name")}</Text>
             <TextInput
               // web .auth-input:focus — the field takes the accent while typing
               style={[styles.input, focused && { borderColor: withAlpha(accent, 0.7) }]}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
               autoFocus
-              placeholder="late night drives, gym, focus…"
+              placeholder={tt("late night drives, gym, focus…")}
               placeholderTextColor={colors.muted}
               value={name}
               maxLength={40}
@@ -165,8 +169,8 @@ export function NewPlaylistSheet({
                 accessibilityState={{ selected: !!rules[key] }}
               >
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.ruleLabel}>{label}</Text>
-                  <Text style={styles.ruleSub}>{sub}</Text>
+                  <Text style={styles.ruleLabel}>{tt(label)}</Text>
+                  <Text style={styles.ruleSub}>{tt(sub)}</Text>
                 </View>
                 <View style={[styles.toggle, rules[key] && styles.toggleOn]}>
                   <View style={[styles.knob, rules[key] && styles.knobOn]} />

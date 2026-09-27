@@ -12,6 +12,7 @@ import type { Playlist, SaveTarget } from "../types";
 import { colors, fonts, PLAYLIST_SWATCHES } from "../design/tokens";
 import { Sheet, sheetText } from "./Sheet";
 
+import { useT } from "../lib/lang";
 function Option({
   icon,
   iconColor,
@@ -66,6 +67,7 @@ export function SaveTargetSheet({
   onCreatePlaylist: (name: string, accent: string) => void;
   onClose: () => void;
 }) {
+  const tt = useT();
   const [name, setName] = useState("");
 
   const create = () => {
@@ -85,21 +87,21 @@ export function SaveTargetSheet({
         };
         return (
           <View>
-            <Text style={sheetText.title}>Swipe down saves to…</Text>
-            <Text style={sheetText.sub}>Pick where a ↓ swipe sends the song.</Text>
+            <Text style={sheetText.title}>{tt("Swipe down saves to…")}</Text>
+            <Text style={sheetText.sub}>{tt("Pick where a ↓ swipe sends the song.")}</Text>
 
             <ScrollView style={styles.options} bounces={false}>
               <Option
                 icon="heart"
                 iconColor={colors.save}
-                label="Liked Songs"
+                label={tt("Liked Songs")}
                 on={value === "liked"}
                 onPress={() => pick("liked")}
               />
               <Option
                 icon="folder"
                 iconColor={colors.more}
-                label="Discoveries playlist"
+                label={tt("Discoveries playlist")}
                 on={value === "discoveries"}
                 onPress={() => pick("discoveries")}
               />
@@ -118,7 +120,7 @@ export function SaveTargetSheet({
             <View style={styles.createRow}>
               <TextInput
                 style={styles.input}
-                placeholder="new playlist name…"
+                placeholder={tt("new playlist name…")}
                 placeholderTextColor={colors.muted}
                 value={name}
                 maxLength={40}
@@ -136,7 +138,7 @@ export function SaveTargetSheet({
                 disabled={!name.trim()}
                 onPress={create}
               >
-                <Text style={styles.createBtnText}>create</Text>
+                <Text style={styles.createBtnText}>{tt("create")}</Text>
               </Pressable>
             </View>
           </View>

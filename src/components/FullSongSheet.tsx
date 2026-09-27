@@ -8,6 +8,7 @@ import { REPORT_COPY } from "../lib/contentReport";
 import { ReportSong } from "./ReportSong";
 import { shareText, songShareUrl, songStoryUrl } from "../lib/growth";
 
+import { useT } from "../lib/lang";
 /** Links out to where the track can legally play in full — mirrors web. */
 export function FullSongSheet({
   track,
@@ -19,6 +20,7 @@ export function FullSongSheet({
   /** this install's anonymous key, so a guest's report is rate-limited too */
   anonKey?: string | null;
 }) {
+  const tt = useT();
   // "Report this song" turns this sheet into the report form (Play's UGC policy)
   const [reporting, setReporting] = useState(false);
   const q = encodeURIComponent(`${track.title} ${track.artist}`);
@@ -46,16 +48,15 @@ export function FullSongSheet({
             }}
           >
             <Text style={[styles.note, { color: track.accent }]}>↗</Text>
-            <Text style={styles.name}>Share this song</Text>
-            <Text style={styles.shareSub}>opens at the hook</Text>
+            <Text style={styles.name}>{tt("Share this song")}</Text>
+            <Text style={styles.shareSub}>{tt("opens at the hook")}</Text>
           </Pressable>
           <Pressable onPress={() => void Linking.openURL(songStoryUrl(track.id))} accessibilityRole="link">
-            <Text style={styles.story}>story image for Instagram</Text>
+            <Text style={styles.story}>{tt("story image for Instagram")}</Text>
           </Pressable>
-          <Text style={sheetText.title}>Hear the whole thing</Text>
+          <Text style={sheetText.title}>{tt("Hear the whole thing")}</Text>
           <Text style={sheetText.sub}>
-            "{track.title}" — {track.artist}. Previews stop at 30 seconds; pick
-            where to keep listening.
+            "{track.title}" — {track.artist}. {tt("Previews stop at 30 seconds; pick where to keep listening.")}
           </Text>
           {services.map((s) => (
             <Pressable
@@ -72,10 +73,10 @@ export function FullSongSheet({
             </Pressable>
           ))}
           {needsItunesCredit(track) ? (
-            <Text style={styles.credit}>preview {ITUNES_CREDIT}</Text>
+            <Text style={styles.credit}>{tt(`preview ${ITUNES_CREDIT}`)}</Text>
           ) : null}
           <Pressable onPress={() => setReporting(true)} accessibilityRole="button">
-            <Text style={styles.report}>{REPORT_COPY.link}</Text>
+            <Text style={styles.report}>{tt(REPORT_COPY.link)}</Text>
           </Pressable>
         </View>
         )

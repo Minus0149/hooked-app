@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { colors, fonts, radii } from "../../design/tokens";
+import { useT } from "../../lib/lang";
 
 /**
  * Chrome for a Settings sub-page, laid out like web's PageShell: back button
@@ -21,6 +22,7 @@ export function SettingsPage({
   onBack: () => void;
   children: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <View style={styles.screen}>
       <View style={styles.topbar}>
@@ -28,7 +30,7 @@ export function SettingsPage({
           style={({ pressed }) => [styles.topBtn, pressed && { transform: [{ scale: 0.92 }] }]}
           onPress={onBack}
           accessibilityRole="button"
-          accessibilityLabel="back to settings"
+          accessibilityLabel={t("back to settings")}
         >
           <Feather name="corner-up-left" size={18} color={colors.text} />
         </Pressable>
@@ -44,9 +46,9 @@ export function SettingsPage({
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title} accessibilityRole="header">
-          {title}
+          {t(title)}
         </Text>
-        {sub ? <Text style={styles.sub}>{sub}</Text> : null}
+        {sub ? <Text style={styles.sub}>{t(sub)}</Text> : null}
         {children}
       </Animated.ScrollView>
     </View>

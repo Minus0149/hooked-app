@@ -16,6 +16,7 @@ import { Face } from "./faces";
 import { useFaceIdle } from "./faceMotion";
 import { Backdrop } from "./Backdrop";
 
+import { useT } from "../lib/lang";
 /**
  * The mood ring — the mobile half of web/src/components/MoodWheel.tsx.
  *
@@ -73,6 +74,7 @@ function RingFace({
   lively: boolean;
   onPress: () => void;
 }) {
+  const tt = useT();
   const idleStyle = useFaceIdle(mood.id, index, aimed, lively);
   const rest = wedgePoint(index, FACE_R);
   const popped = wedgePoint(index, FACE_R + POP);
@@ -105,7 +107,7 @@ function RingFace({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${mood.label} — ${mood.line}`}
+        accessibilityLabel={`${tt(mood.label)} — ${tt(mood.line)}`}
         accessibilityState={{ selected: picked }}
         style={styles.faceHit}
       >
@@ -237,6 +239,7 @@ export function MoodWheel({
   /** the line under everything; defaults to the card's "what are you in the mood for?" */
   hint?: string;
 }) {
+  const tt = useT();
   const reach = R_OUT + POP + EDGE;
   const fx = origin.x - host.x;
   const fy = origin.y - host.y;
@@ -306,9 +309,9 @@ export function MoodWheel({
             // one card for both lines — the description alone over busy
             // artwork was the hardest thing on screen to read
             <View style={styles.labelCard}>
-              <Text style={[styles.labelCardTitle, { color: lead.accent }]}>{lead.label}</Text>
+              <Text style={[styles.labelCardTitle, { color: lead.accent }]}>{tt(lead.label)}</Text>
               <Text style={styles.labelCardLine} numberOfLines={1}>
-                {lead.line}
+                {tt(lead.line)}
               </Text>
             </View>
           ) : (

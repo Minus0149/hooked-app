@@ -17,6 +17,7 @@ import { AuthForm } from "./AuthForm";
 import { AccessGate } from "./AccessGate";
 import { InviteCard } from "./InviteCard";
 
+import { useT } from "../lib/lang";
 const ENTER = (i: number) => FadeInDown.duration(320).delay(i * 70);
 
 /**
@@ -33,6 +34,7 @@ export function ProfileScreen({
   onBack: () => void;
   onPlay: (trackId: string) => void;
 }) {
+  const tt = useT();
   const session = authClient.useSession();
   const { state } = useStore();
   // "Not in the beta yet? Apply" swaps the sign-in form for the application
@@ -133,7 +135,7 @@ export function ProfileScreen({
 
           {topGenres.length > 0 && (
             <Animated.View entering={ENTER(2)}>
-              <Text style={styles.group}>your taste</Text>
+              <Text style={styles.group}>{tt("your taste")}</Text>
               <View style={styles.chips}>
                 {topGenres.map(([genre, count], i) => (
                   <View
@@ -156,7 +158,7 @@ export function ProfileScreen({
 
           {liked.length > 0 && (
             <Animated.View entering={ENTER(3)}>
-              <Text style={styles.group}>recently saved</Text>
+              <Text style={styles.group}>{tt("recently saved")}</Text>
               {liked.slice(0, 5).map((t) => (
                 <Pressable
                   key={t.id}
@@ -195,7 +197,7 @@ export function ProfileScreen({
               style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}
               onPress={() => void authClient.signOut()}
             >
-              <Text style={styles.signOutText}>Sign out</Text>
+              <Text style={styles.signOutText}>{tt("Sign out")}</Text>
             </Pressable>
           </Animated.View>
         </ScrollView>

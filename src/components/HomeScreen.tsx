@@ -17,6 +17,7 @@ import { Face } from "./faces";
 import { RecapCard } from "./RecapCard";
 import { inkOn } from "../lib/contrast";
 import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodsForHour } from "../data/mood";
+import { useT } from "../lib/lang";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -52,6 +53,38 @@ function Mosaic({ tracks }: { tracks: Track[] }) {
   );
 }
 
+/** Today's personal pick (lib/hookOfDay.ts), same card as the web's .hotd. */
+function HookOfDayCard({ track, onPlay }: { track: Track; onPlay: (t: Track) => void }) {
+  const t = useT();
+  const onAccent = inkOn(track.accent);
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.hotd,
+        { borderColor: mixHex(track.accent, colors.line, 0.5) },
+        pressed && styles.pressed,
+      ]}
+      onPress={() => onPlay(track)}
+      accessibilityRole="button"
+      accessibilityLabel={`${t("Hook of the day")}: ${track.title} — ${track.artist}`}
+    >
+      <Image source={{ uri: art(track.artwork, 200) }} style={styles.hotdArt} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.hotdKicker, { color: track.accent }]}>{t("Hook of the day").toUpperCase()}</Text>
+        <Text style={styles.hotdTitle} numberOfLines={1}>
+          {track.title}
+        </Text>
+        <Text style={styles.hotdArtist} numberOfLines={1}>
+          {track.artist}
+        </Text>
+      </View>
+      <View style={[styles.hotdPlay, { backgroundColor: track.accent }]}>
+        <Feather name="play" size={16} color={onAccent} />
+      </View>
+    </Pressable>
+  );
+}
+
 function RowCard({ track, onPick }: { track: Track; onPick: (id: string) => void }) {
   return (
     <Pressable
@@ -74,12 +107,18 @@ export function HomeScreen({
   onDiscover,
   onOpenLibrary,
   onNewPlaylist,
+  hookOfDay,
+  onPlayHookOfDay,
 }: {
   accent: string;
   onDiscover: (trackId?: string) => void;
   onOpenLibrary: (container: LibraryContainer) => void;
   onNewPlaylist: () => void;
+  /** today's pick, or null when hidden in Settings / nothing to pick */
+  hookOfDay?: Track | null;
+  onPlayHookOfDay?: (t: Track) => void;
 }) {
+  const t = useT();
   const { state, setMood } = useStore();
   const { liked, discoveries, playlists, queue, boostGenres, catalog } = state;
 
@@ -145,9 +184,9 @@ export function HomeScreen({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.greeting}>{greeting()}</Text>
+      <Text style={styles.greeting}>{t(greeting())}</Text>
       <Text style={styles.title}>
-        what's your next <Text style={{ color: accent }}>obsession?</Text>
+        {t("what's your next")} <Text style={{ color: accent }}>{t("obsession?")}</Text>
       </Text>
 
       <Pressable
@@ -159,14 +198,18 @@ export function HomeScreen({
         onPress={() => onDiscover()}
       >
         <View style={{ flex: 1 }}>
-          <Text style={[styles.ctaLabel, { color: onAccent }]}>Start discovering</Text>
-          <Text style={[styles.ctaSub, { color: onAccent }]}>{queue.length} songs queued for you</Text>
+          <Text style={[styles.ctaLabel, { color: onAccent }]}>{t("Start discovering")}</Text>
+          <Text style={[styles.ctaSub, { color: onAccent }]}>
+            {t("{n} songs queued for you", { n: queue.length })}
+          </Text>
         </View>
         <Eq color={onAccent} playing />
       </Pressable>
 
+      {hookOfDay && onPlayHookOfDay && <HookOfDayCard track={hookOfDay} onPlay={onPlayHookOfDay} />}
+
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>What&apos;s the mood?</Text>
+        <Text style={styles.sectionTitle}>{t("What's the mood?")}</Text>
       </View>
       <View style={styles.moodRow}>
         {hour.moods.map((mood) => {
@@ -186,7 +229,7 @@ export function HomeScreen({
               }}
               accessibilityRole="button"
               accessibilityState={{ selected: isOn }}
-              accessibilityLabel={`${mood.label} — ${mood.line}`}
+              accessibilityLabel={`${t(mood.label)} — ${t(mood.line)}`}
             >
               <View
                 style={[
@@ -210,7 +253,7 @@ export function HomeScreen({
                 ]}
                 numberOfLines={1}
               >
-                {mood.label}
+                {t(mood.label)}
               </Text>
             </Pressable>
           );
@@ -223,7 +266,7 @@ export function HomeScreen({
           }}
           accessibilityRole="button"
           accessibilityState={{ selected: state.mood === null }}
-          accessibilityLabel="Any — no mood on the deck"
+          accessibilityLabel={t("Any — no mood on the deck")}
         >
           <View
             style={[
@@ -236,18 +279,18 @@ export function HomeScreen({
           <Text
             style={[styles.moodChipLabel, { color: state.mood === null ? colors.text : colors.muted }]}
           >
-            Any
+            {t("Any")}
           </Text>
         </Pressable>
       </View>
       {state.prefs.moodByTime !== "off" ? (
-        <Text style={styles.moodNudge}>{DAYPART_COPY[hour.part].nudge}</Text>
+        <Text style={styles.moodNudge}>{t(DAYPART_COPY[hour.part].nudge)}</Text>
       ) : null}
 
       <RecapCard />
 
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Your library</Text>
+        <Text style={styles.sectionTitle}>{t("Your library")}</Text>
       </View>
       {libraryEmpty ? (
         // one invitation, not two empty boxes pretending to be a library
@@ -260,9 +303,9 @@ export function HomeScreen({
             <Feather name="heart" size={17} color={colors.save} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+            <Text style={styles.emptyTitle}>{t("Nothing saved yet")}</Text>
             <Text style={styles.emptySub}>
-              Swipe a song down to keep it. Tap here, or hold +, to start a playlist.
+              {t("Swipe a song down to keep it. Tap here, or hold +, to start a playlist.")}
             </Text>
           </View>
         </Pressable>
@@ -273,9 +316,9 @@ export function HomeScreen({
           onPress={() => onOpenLibrary("liked")}
         >
           <Mosaic tracks={liked} />
-          <Text style={styles.tileName}>Liked Songs</Text>
+          <Text style={styles.tileName}>{t("Liked Songs")}</Text>
           <Text style={styles.tileSub}>
-            {liked.length} {liked.length === 1 ? "song" : "songs"}
+            {t(liked.length === 1 ? "{n} song" : "{n} songs", { n: liked.length })}
           </Text>
         </Pressable>
         <Pressable
@@ -283,9 +326,9 @@ export function HomeScreen({
           onPress={() => onOpenLibrary("discoveries")}
         >
           <Mosaic tracks={discoveries} />
-          <Text style={styles.tileName}>Discoveries</Text>
+          <Text style={styles.tileName}>{t("Discoveries")}</Text>
           <Text style={styles.tileSub}>
-            {discoveries.length} {discoveries.length === 1 ? "song" : "songs"}
+            {t(discoveries.length === 1 ? "{n} song" : "{n} songs", { n: discoveries.length })}
           </Text>
         </Pressable>
         {playlists.map((p) => (
@@ -303,7 +346,7 @@ export function HomeScreen({
               {p.name}
             </Text>
             <Text style={styles.tileSub}>
-              {p.tracks.length} {p.tracks.length === 1 ? "song" : "songs"}
+              {t(p.tracks.length === 1 ? "{n} song" : "{n} songs", { n: p.tracks.length })}
             </Text>
           </Pressable>
         ))}
@@ -314,7 +357,7 @@ export function HomeScreen({
         <View key={row.genre} style={styles.becauseWrap}>
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>
-              Because you wanted more{" "}
+              {t("Because you wanted more")}{" "}
               <Text style={{ color: accent }}>{row.genre}</Text>
             </Text>
           </View>
@@ -324,16 +367,16 @@ export function HomeScreen({
             style={styles.rowScroll}
             contentContainerStyle={styles.rowScrollContent}
           >
-            {row.tracks.map((t) => (
-              <RowCard key={t.id} track={t} onPick={(id) => onDiscover(id)} />
+            {row.tracks.map((tr) => (
+              <RowCard key={tr.id} track={tr} onPick={(id) => onDiscover(id)} />
             ))}
           </ScrollView>
         </View>
       ))}
 
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>Fresh for you</Text>
-        <Text style={styles.sectionCount}>tap to play</Text>
+        <Text style={styles.sectionTitle}>{t("Fresh for you")}</Text>
+        <Text style={styles.sectionCount}>{t("tap to play")}</Text>
       </View>
       <ScrollView
         horizontal
@@ -341,29 +384,29 @@ export function HomeScreen({
         style={styles.rowScroll}
         contentContainerStyle={styles.rowScrollContent}
       >
-        {fresh.map((t) => (
-          <RowCard key={t.id} track={t} onPick={(id) => onDiscover(id)} />
+        {fresh.map((tr) => (
+          <RowCard key={tr.id} track={tr} onPick={(id) => onDiscover(id)} />
         ))}
       </ScrollView>
 
       {liked.length > 0 && (
         <>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Recently saved</Text>
+            <Text style={styles.sectionTitle}>{t("Recently saved")}</Text>
           </View>
-          {liked.slice(0, 5).map((t) => (
+          {liked.slice(0, 5).map((tr) => (
             <Pressable
-              key={t.id}
+              key={tr.id}
               style={({ pressed }) => [styles.listRow, pressed && styles.pressed]}
-              onPress={() => onDiscover(t.id)}
+              onPress={() => onDiscover(tr.id)}
             >
-              <Image source={{ uri: art(t.artwork, 100) }} style={styles.listArt} />
+              <Image source={{ uri: art(tr.artwork, 100) }} style={styles.listArt} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.listTitle} numberOfLines={1}>
-                  {t.title}
+                  {tr.title}
                 </Text>
                 <Text style={styles.listArtist} numberOfLines={1}>
-                  {t.artist}
+                  {tr.artist}
                 </Text>
               </View>
               <Feather name="heart" size={14} color={colors.save} />
@@ -376,6 +419,21 @@ export function HomeScreen({
 }
 
 const styles = StyleSheet.create({
+  hotd: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 12,
+    marginBottom: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+  },
+  hotdArt: { width: 64, height: 64, borderRadius: 14 },
+  hotdKicker: { fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.4 },
+  hotdTitle: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.text, marginTop: 2 },
+  hotdArtist: { fontFamily: fonts.bodyMedium, fontSize: 12.5, color: colors.muted, marginTop: 2 },
+  hotdPlay: { width: 40, height: 40, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   scroll: { flex: 1 },
   // extra bottom padding so content never scrolls under the protruding nav FAB
   content: { paddingHorizontal: 20, paddingBottom: 38 },

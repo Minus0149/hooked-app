@@ -11,6 +11,7 @@ import Svg, { Path } from "react-native-svg";
 import { Feather } from "@expo/vector-icons";
 import { colors, fonts, mixHex, withAlpha } from "../design/tokens";
 
+import { useT } from "../lib/lang";
 export type NavView = "home" | "discover";
 
 const FAB = 58;
@@ -96,6 +97,7 @@ export function BottomNav({
   onHoldMove?: (dx: number, dy: number) => void;
   onHoldEnd?: () => void;
 }) {
+  const tt = useT();
   // Tap makes a playlist; a hold opens the faces and the same finger aims.
   // Exclusive: the tap only fires if the hold never activated, so a hold's
   // release can't also open the new-playlist sheet.
@@ -188,7 +190,7 @@ export function BottomNav({
             <Animated.View
               accessible
               accessibilityRole="button"
-              accessibilityLabel="Create a playlist"
+              accessibilityLabel={tt("Create a playlist")}
               accessibilityHint="Hold to pick a mood for a playlist"
               // dark and ringed, not a second pink button: "Start discovering"
               // is the one filled accent on home

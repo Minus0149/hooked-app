@@ -8,6 +8,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
 import { colors, fonts, radii } from "../../design/tokens";
+import { useT } from "../../lib/lang";
+
+/** Plain-text children go through the translator; anything richer passes as is. */
+function useTx() {
+  const t = useT();
+  return (node: ReactNode) => (typeof node === "string" ? t(node) : node);
+}
 
 /** Animated track+knob switch matching web's .toggle — save-green when on. */
 export function Toggle({ on }: { on: boolean }) {
@@ -99,6 +106,9 @@ export function Row({
   onPress?: () => void;
 }) {
   const grouped = useContext(InGroup);
+  const t = useT();
+  label = t(label);
+  sub = sub ? t(sub) : sub;
   return (
     <Pressable
       style={({ pressed }) => [styles.row, grouped && styles.rowGrouped, pressed && { opacity: 0.8 }]}
@@ -132,6 +142,7 @@ export function Segmented<T extends string>({
   accent?: string;
   onChange: (id: T) => void;
 }) {
+  const t = useT();
   return (
     <View style={segStyles.wrap}>
       {options.map((o) => {
@@ -147,7 +158,7 @@ export function Segmented<T extends string>({
               on && { backgroundColor: accent ?? colors.accentDefault, borderColor: accent ?? colors.accentDefault },
             ]}
           >
-            <Text style={[segStyles.label, on && { color: colors.ink }]}>{o.label}</Text>
+            <Text style={[segStyles.label, on && { color: colors.ink }]}>{t(o.label)}</Text>
           </Pressable>
         );
       })}
@@ -156,7 +167,8 @@ export function Segmented<T extends string>({
 }
 
 export function GroupLabel({ children }: { children: ReactNode }) {
-  return <Text style={styles.group}>{children}</Text>;
+  const tx = useTx();
+  return <Text style={styles.group}>{tx(children)}</Text>;
 }
 
 /**
@@ -179,6 +191,9 @@ export function StaticRow({
   sub?: string;
   right?: ReactNode;
 }) {
+  const t = useT();
+  label = t(label);
+  sub = sub ? t(sub) : sub;
   return (
     <View style={styles.row} accessibilityLabel={sub ? `${label}. ${sub}` : label}>
       <RowIcon icon={icon} glyph={glyph} color={iconColor} />
@@ -193,7 +208,8 @@ export function StaticRow({
 
 /** The quiet word at a row's right edge — "save", "open", "change" (web .settings-row-value). */
 export function RowValue({ children, color }: { children: ReactNode; color?: string }) {
-  return <Text style={[styles.rowValue, color != null && { color }]}>{children}</Text>;
+  const tx = useTx();
+  return <Text style={[styles.rowValue, color != null && { color }]}>{tx(children)}</Text>;
 }
 
 /**
@@ -211,23 +227,26 @@ export function Block({
   children?: ReactNode;
   style?: object;
 }) {
+  const tx = useTx();
   return (
     <View style={[styles.block, style]}>
-      {label ? <Text style={styles.blockLabel}>{label}</Text> : null}
+      {label ? <Text style={styles.blockLabel}>{tx(label)}</Text> : null}
       {children}
-      {hint ? <Text style={styles.blockHint}>{hint}</Text> : null}
+      {hint ? <Text style={styles.blockHint}>{tx(hint)}</Text> : null}
     </View>
   );
 }
 
 /** A hint line outside any card (web `.prefs-hint`). */
 export function Hint({ children }: { children: ReactNode }) {
-  return <Text style={styles.hintLine}>{children}</Text>;
+  const tx = useTx();
+  return <Text style={styles.hintLine}>{tx(children)}</Text>;
 }
 
 /** A bare label above chips that sit outside a card (web `.prefs-label`). */
 export function FieldLabel({ children }: { children: ReactNode }) {
-  return <Text style={[styles.blockLabel, { marginTop: 14, marginBottom: 8 }]}>{children}</Text>;
+  const tx = useTx();
+  return <Text style={[styles.blockLabel, { marginTop: 14, marginBottom: 8 }]}>{tx(children)}</Text>;
 }
 
 const styles = StyleSheet.create({

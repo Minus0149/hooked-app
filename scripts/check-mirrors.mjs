@@ -44,6 +44,10 @@ const MODULES = [
   "lib/catalogCodec.ts",
   "lib/promoted.ts",
   "lib/growth.ts",
+  "lib/playSession.ts",
+  "lib/playlistExport.ts",
+  "lib/hookOfDay.ts",
+  "lib/i18n.ts",
 ];
 
 try {

@@ -71,6 +71,7 @@ import { PlaybackPage } from "./src/components/settings/PlaybackPage";
 import { GesturesPage } from "./src/components/settings/GesturesPage";
 import { SoundPage } from "./src/components/settings/SoundPage";
 import { DataPage } from "./src/components/settings/DataPage";
+import { LanguagePage } from "./src/components/settings/LanguagePage";
 import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { ProfileScreen } from "./src/components/ProfileScreen";
 import { Onboarding } from "./src/components/Onboarding";
@@ -82,7 +83,15 @@ import { UpdateBanner } from "./src/components/UpdateBanner";
 import { SponsoredCard, type AdCardData } from "./src/components/SponsoredCard";
 import { shouldAskForAd } from "./src/lib/ads-scheduler";
 import { PROMOTED_LISTEN_MS, promotedDue, promotedFollowUp, promotedOutcome } from "./src/lib/promoted";
-import { colors, fonts, radii } from "./src/design/tokens";
+import { colors, fonts, radii, withAlpha } from "./src/design/tokens";
+import { LangProvider, useT } from "./src/lib/lang";
+import { sessionPosition } from "./src/lib/playSession";
+import { useHookOfDay, useNotifySettings } from "./src/lib/useHookOfDay";
+import {
+  installForegroundHandler,
+  onHookNotificationTap,
+  scheduleHookNotifications,
+} from "./src/lib/hookOfDayNotify";
 import {
   DIR_TO_ACTION,
   type LibraryContainer,
@@ -104,7 +113,7 @@ const FREE_SWIPES = 5;
 
 const convex = new ConvexReactClient(CONVEX_URL);
 
-type SettingsPageId = "appearance" | "playback" | "gestures" | "sound" | "data" | "support";
+type SettingsPageId = "appearance" | "playback" | "gestures" | "sound" | "data" | "support" | "language";
 type Screen =
   | "home"
   | "discover"
@@ -228,7 +237,10 @@ function Shell() {
     unblockArtist,
     setTaste,
     setPrefs,
+    startSession,
+    endSession,
   } = useStore();
+  const tx = useT();
 
   // ----- navigation: a real stack -----
   //
@@ -1088,6 +1100,38 @@ function Shell() {
     [jumpTo, switchTab],
   );
 
+  // ----- hook of the day: Home card + the daily local notification -----
+  const libraryIds = useMemo(
+    () =>
+      new Set(
+        [...state.liked, ...state.discoveries, ...state.playlists.flatMap((p) => p.tracks)].map((t) => t.id),
+      ),
+    [state.liked, state.discoveries, state.playlists],
+  );
+  const hotdSettings = useNotifySettings();
+  const hookOfDay = useHookOfDay(state.queue, state.catalog, libraryIds);
+  const goDiscoverRef = useRef(goDiscover);
+  goDiscoverRef.current = goDiscover;
+  useEffect(() => {
+    installForegroundHandler();
+    return onHookNotificationTap((id) => goDiscoverRef.current(id));
+  }, []);
+  // reschedule the week ahead on every app open (and when the time, the
+  // switch or the language changes) so the picks follow the listener's taste
+  const scheduleInput = useRef({ queue: state.queue, libraryIds });
+  scheduleInput.current = { queue: state.queue, libraryIds };
+  useEffect(() => {
+    if (!state.hydrated) return;
+    // after the Home card has settled today's pick, so both agree
+    const id = setTimeout(() => {
+      const { queue, libraryIds: exclude } = scheduleInput.current;
+      void scheduleHookNotifications(queue, exclude, hotdSettings, {
+        title: tx("Your hook of the day is ready"),
+      }).catch(() => undefined);
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [state.hydrated, hotdSettings, tx]);
+
   const handleCreatePlaylist = useCallback(
     async (
       name: string,
@@ -1359,6 +1403,8 @@ function Shell() {
             onDiscover={goDiscover}
             onOpenLibrary={(c) => push(`library:${c}`)}
             onNewPlaylist={() => setNewPlaylistOpen(true)}
+            hookOfDay={hotdSettings.showOnHome ? hookOfDay : null}
+            onPlayHookOfDay={(t) => goDiscover(t.id)}
           />
         </>
       )}
@@ -1385,9 +1431,39 @@ function Shell() {
               )}
               <Feather name="corner-up-left" size={18} color={colors.text} />
             </Pressable>
-            <Text style={styles.wordmark}>
-              hookedcue<Text style={{ color: accent }}>.</Text>
-            </Text>
+            {(() => {
+              // playing a saved list: the wordmark becomes "Liked Songs · 3 of 12";
+              // tapping it goes back to discovering
+              const pos = sessionPosition(state.session, state.queue[0]?.id);
+              if (!state.session || !pos) {
+                return (
+                  <Text style={styles.wordmark}>
+                    hookedcue<Text style={{ color: accent }}>.</Text>
+                  </Text>
+                );
+              }
+              return (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.sessionPill,
+                    { backgroundColor: withAlpha(accent, 0.14), borderColor: withAlpha(accent, 0.45) },
+                    pressed && { transform: [{ scale: 0.96 }] },
+                  ]}
+                  onPress={endSession}
+                  accessibilityRole="button"
+                  accessibilityLabel={tx("Stop playing {title}", { title: state.session.title })}
+                >
+                  <Feather name="play" size={11} color={accent} />
+                  <Text style={styles.sessionPillTitle} numberOfLines={1}>
+                    {state.session.title}
+                  </Text>
+                  <Text style={styles.sessionPillCount}>
+                    {tx("{i} of {n}", { i: pos.index, n: pos.total })}
+                  </Text>
+                  <Feather name="x" size={12} color={colors.muted} />
+                </Pressable>
+              );
+            })()}
             <Pressable
               style={({ pressed }) => [styles.topBtn, pressed && styles.topBtnPressed]}
               onPress={() => setSaveSheetOpen(true)}
@@ -1476,6 +1552,7 @@ function Shell() {
         />
       )}
       {screen === "settings:gestures" && <GesturesPage onBack={pop} />}
+      {screen === "settings:language" && <LanguagePage onBack={pop} />}
       {screen === "settings:support" && <SupportPage onBack={pop} />}
       {screen === "settings:sound" && (
         <SoundPage
@@ -1499,7 +1576,11 @@ function Shell() {
         <LibraryScreen
           container={screen.slice(8) as LibraryContainer}
           onBack={pop}
-          onPlay={(id) => goDiscover(id)}
+          onPlay={(s) => {
+            startSession({ container: screen.slice(8), ...s });
+            // pushed, not a tab switch: back returns to the list
+            push("discover");
+          }}
           onRemove={handleRemoveSong}
           onDeletePlaylist={handleDeletePlaylist}
           onDiscoverInto={handleDiscoverInto}
@@ -1607,11 +1688,13 @@ export default function App() {
         >
           {/* inside the providers, so recovering keeps the session and store */}
           <AppErrorBoundary>
-            <StoreProvider>
-              <DialogProvider>
-                <Shell />
-              </DialogProvider>
-            </StoreProvider>
+            <LangProvider>
+              <StoreProvider>
+                <DialogProvider>
+                  <Shell />
+                </DialogProvider>
+              </StoreProvider>
+            </LangProvider>
           </AppErrorBoundary>
         </ConvexBetterAuthProvider>
       </SafeAreaProvider>
@@ -1634,6 +1717,18 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: -0.3,
   },
+  sessionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    maxWidth: "62%",
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  sessionPillTitle: { fontFamily: fonts.displayBold, fontSize: 12.5, color: colors.text, flexShrink: 1 },
+  sessionPillCount: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.muted },
   topBtn: {
     width: 42,
     height: 42,

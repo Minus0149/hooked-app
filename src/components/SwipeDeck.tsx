@@ -53,15 +53,16 @@ import { Eq } from "./Eq";
 import { ITUNES_CREDIT, needsItunesCredit } from "../lib/attribution";
 import { PROMOTED_LABEL, PROMOTED_WHY } from "../lib/promoted";
 
+import { useT } from "../lib/lang";
 // a save only locks the deck briefly — the DiscFX overlay plays above while
 // the next card is already swipeable
 const SAVE_LOCK_MS = 200;
 
 const STAMP: Record<SwipeDir, { label: string; color: string }> = {
-  up: { label: "SKIP ↑", color: "#FFFFFF" },
-  down: { label: "♥ SAVED", color: colors.save },
-  right: { label: "✦ MORE LIKE THIS", color: colors.more },
-  left: { label: "✕ NEVER", color: colors.never },
+  up: { label: "skip", color: "#FFFFFF" },
+  down: { label: "saved", color: colors.save },
+  right: { label: "more like this", color: colors.more },
+  left: { label: "never", color: colors.never },
 };
 
 export function resolveDirWorklet(
@@ -189,11 +190,12 @@ function ActionButton({
   label: string;
   onPress: () => void;
 }) {
+  const tt = useT();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={tt(label)}
       style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
       hitSlop={6}
     >
@@ -265,6 +267,7 @@ export function SwipeDeck({
   onPickMood: (mood: MoodId, trackId: string) => void;
   onClearMood: () => void;
 }) {
+  const tt = useT();
   const [onDeck, next, nextNext] = tracks;
   // live dims: module-scope Dimensions went stale on rotation/foldables and
   // computed fly-out distances once, so cards died mid-screen on tall screens
@@ -639,28 +642,28 @@ export function SwipeDeck({
         style={[styles.stamp, styles.stampUp, { borderColor: STAMP.up.color }, upStamp]}
       >
         <Text style={[styles.stampText, { color: STAMP.up.color }]}>
-          {STAMP.up.label}
+          {tt(STAMP.up.label).toUpperCase()} ↑
         </Text>
       </Animated.View>
       <Animated.View
         style={[styles.stamp, styles.stampDown, { borderColor: STAMP.down.color }, downStamp]}
       >
         <Text style={[styles.stampText, { color: STAMP.down.color }]}>
-          {STAMP.down.label}
+          ♥ {tt(STAMP.down.label).toUpperCase()}
         </Text>
       </Animated.View>
       <Animated.View
         style={[styles.stamp, styles.stampRight, { borderColor: STAMP.right.color }, rightStamp]}
       >
         <Text style={[styles.stampText, { color: STAMP.right.color }]}>
-          {STAMP.right.label}
+          ✦ {tt(STAMP.right.label).toUpperCase()}
         </Text>
       </Animated.View>
       <Animated.View
         style={[styles.stamp, styles.stampLeft, { borderColor: STAMP.left.color }, leftStamp]}
       >
         <Text style={[styles.stampText, { color: STAMP.left.color }]}>
-          {STAMP.left.label}
+          ✕ {tt(STAMP.left.label).toUpperCase()}
         </Text>
       </Animated.View>
 
@@ -740,10 +743,11 @@ export function SwipeDeck({
         {!onDeck && (
           <View style={styles.emptyDeck}>
             <Feather name="slash" size={26} color={colors.muted} />
-            <Text style={styles.emptyTitle}>nothing left to deal</Text>
+            <Text style={styles.emptyTitle}>{tt("nothing left to deal")}</Text>
             <Text style={styles.emptyCopy}>
-              You've ruled out every artist in the catalog. Unblock some in
-              Settings, or remove songs from your library to hear them again.
+              {tt(
+                "You've ruled out every artist in the catalog. Unblock some in Settings, or remove songs from your library to hear them again.",
+              )}
             </Text>
           </View>
         )}
@@ -764,7 +768,7 @@ export function SwipeDeck({
                 pressed && { transform: [{ scale: 0.94 }] },
               ]}
             >
-              <Text style={styles.chipText}>keep listening ▸</Text>
+              <Text style={styles.chipText}>{tt("keep listening")} ▸</Text>
             </Pressable>
           </Animated.View>
         )}
