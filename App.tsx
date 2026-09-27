@@ -185,6 +185,7 @@ interface ServerCatalogTrack extends ServerTrack {
   sound?: string;
   audioMood?: number[];
   vocal?: number;
+  lang?: string;
 }
 
 const toLocalCatalog = (t: ServerCatalogTrack): Track => ({
@@ -198,6 +199,7 @@ const toLocalCatalog = (t: ServerCatalogTrack): Track => ({
   sound: t.sound,
   audioMood: t.audioMood,
   vocal: t.vocal,
+  lang: t.lang,
 });
 
 const toLocal = (t: ServerTrack): Track => ({
@@ -316,14 +318,27 @@ function Shell() {
   ) as { creator: unknown; curator: boolean } | null | undefined;
 
   const runtimeCfg = useQuery(anyApi.runtime.get) as
-    | { gateFreeSwipes: number; moodStrength: number; modelStrength: number }
+    | {
+        gateFreeSwipes: number;
+        moodStrength: number;
+        modelStrength: number;
+        // absent from a server older than the India/global split
+        indiaSharePct?: number;
+        pickedLangPct?: number;
+      }
     | null
     | undefined;
 
   // the two dials for the client-side signals; offline the client defaults hold
   useEffect(() => {
     if (!runtimeCfg) return;
-    setStrengths(runtimeCfg.moodStrength, runtimeCfg.modelStrength);
+    setStrengths(
+      runtimeCfg.moodStrength,
+      runtimeCfg.modelStrength,
+      typeof runtimeCfg.indiaSharePct === "number" && typeof runtimeCfg.pickedLangPct === "number"
+        ? { indiaPct: runtimeCfg.indiaSharePct, pickedPct: runtimeCfg.pickedLangPct }
+        : undefined,
+    );
   }, [runtimeCfg, setStrengths]);
 
   /**
