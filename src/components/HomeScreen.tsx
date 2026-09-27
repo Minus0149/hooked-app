@@ -18,7 +18,7 @@ import { RecapCard } from "./RecapCard";
 import { inkOn } from "../lib/contrast";
 import { useLang, useT } from "../lib/lang";
 import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodById, moodsForHour, type MoodId } from "../data/mood";
-import { FEATURED_LABEL, SPONSORED_TAG, deckLabel } from "../lib/features";
+import { DECK_LABEL, FEATURED_LABEL, SPONSORED_TAG } from "../lib/features";
 
 /** This week's indie hook, as Home shows it (convex/featured.ts: current). */
 export type FeaturedPick = { blurb: string; track: Track };
@@ -217,11 +217,11 @@ export function HomeScreen({
           style={({ pressed }) => [styles.featured, pressed && styles.pressed]}
           onPress={() => onPlayFeatured?.(featured.track)}
           accessibilityRole="button"
-          accessibilityLabel={`${FEATURED_LABEL}: ${featured.track.title} by ${featured.track.artist}. Play it.`}
+          accessibilityLabel={`${t(FEATURED_LABEL)}: ${featured.track.title} — ${featured.track.artist}. ${t("Play it")}.`}
         >
           <Image source={{ uri: art(featured.track.artwork, 300) }} style={styles.featuredArt} />
           <View style={styles.featuredText}>
-            <Text style={styles.featuredKicker}>{FEATURED_LABEL.toUpperCase()}</Text>
+            <Text style={styles.featuredKicker}>{t(FEATURED_LABEL).toUpperCase()}</Text>
             <Text style={styles.featuredTitle} numberOfLines={1}>{featured.track.title}</Text>
             <Text style={styles.featuredArtist} numberOfLines={1}>{featured.track.artist}</Text>
             <Text style={styles.featuredBlurb} numberOfLines={2}>{featured.blurb}</Text>
@@ -343,7 +343,7 @@ export function HomeScreen({
             ]}
             onPress={() => onOpenDeck?.(d)}
             accessibilityRole="button"
-            accessibilityLabel={`${deckLabel(d)}. ${SPONSORED_TAG}.`}
+            accessibilityLabel={`${t(DECK_LABEL, { title: d.title, brand: d.brand })}. ${t(SPONSORED_TAG)}.`}
           >
             {d.logoUrl ? (
               <Image source={{ uri: d.logoUrl }} style={styles.deckLogo} />
@@ -353,8 +353,8 @@ export function HomeScreen({
               </View>
             ) : null}
             <View style={styles.deckText}>
-              <Text style={styles.deckTitle} numberOfLines={2}>{deckLabel(d)}</Text>
-              <Text style={styles.deckTag}>{SPONSORED_TAG.toUpperCase()}</Text>
+              <Text style={styles.deckTitle} numberOfLines={2}>{t(DECK_LABEL, { title: d.title, brand: d.brand })}</Text>
+              <Text style={styles.deckTag}>{t(SPONSORED_TAG).toUpperCase()}</Text>
             </View>
           </Pressable>
         );
