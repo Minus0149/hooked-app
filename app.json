@@ -3,7 +3,7 @@
     "name": "hookedcue",
     "slug": "hooked-music",
     "scheme": "hooked",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "jsEngine": "hermes",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,7 +20,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.minus.hookedcue",
-      "buildNumber": "1.0.2",
+      "buildNumber": "1.0.3",
       "supportsTablet": true,
       "infoPlist": {
         "UIBackgroundModes": ["audio"]
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.minus.hookedcue",
-      "versionCode": 3,
+      "versionCode": 4,
       "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#08080C",

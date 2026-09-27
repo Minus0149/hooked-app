@@ -53,6 +53,9 @@ it has already seen, so bump it for every upload. `eas.json` sets
 `appVersionSource: remote`, which only applies to EAS builds — a local build uses
 whatever is in `app.json`.
 
-Current: `1.0.2`, versionCode `3`, package `com.minus.hookedcue`, targetSdk 36.
+Current: `1.0.3`, versionCode `4`, package `com.minus.hookedcue`, targetSdk 36.
+`1.0.2` / versionCode 3 is the first closed-test release (in review 2026-09-27). 1.0.3 adds a
+native module (expo-notifications), so its runtime version differs: never publish an OTA built
+from 1.0.3 code to the 1.0.2 channel, and never bump back.
 The package was `com.minus.hooked` until 2026-09-26, before any Play upload; Play
 locks the package at the first upload, so it can never change again after that.
