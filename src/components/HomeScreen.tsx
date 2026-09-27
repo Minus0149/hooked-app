@@ -538,8 +538,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginTop: 12,
-    marginBottom: 12,
+    // the mood nudge above already leaves 28; sit close under it and leave a
+    // full section gap before "Your library", as on the web
+    marginTop: -12,
+    marginBottom: 28,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 16,
