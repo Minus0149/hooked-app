@@ -23,7 +23,9 @@
       "buildNumber": "1.0.3",
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -86,6 +88,14 @@
             "imageWidth": 180,
             "resizeMode": "contain",
             "backgroundColor": "#08080C"
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": ["armeabi-v7a", "arm64-v8a"]
           }
         }
       ]
