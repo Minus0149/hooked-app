@@ -116,3 +116,10 @@ New-Item -ItemType Directory -Force "$root\content" | Out-Null
 Copy-Item $aab "$root\content\hooked-release.aab" -Force
 $size = [Math]::Round((Get-Item "$root\content\hooked-release.aab").Length / 1MB, 1)
 & $log "AAB READY: $root\content\hooked-release.aab (${size}MB)"
+
+# R8 renames classes; Play needs this map to turn crash stacks back into names
+# (upload it with the bundle: Play Console > the release > "Upload deobfuscation file")
+$mapping = "$root\mobile\android\app\build\outputs\mapping\release\mapping.txt"
+if (-not (Test-Path $mapping)) { throw "R8 is on but there's no mapping.txt at $mapping" }
+Copy-Item $mapping "$root\content\hooked-release-mapping.txt" -Force
+& $log "MAPPING READY: $root\content\hooked-release-mapping.txt"

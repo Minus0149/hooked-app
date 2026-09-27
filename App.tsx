@@ -325,6 +325,7 @@ function Shell() {
         // absent from a server older than the India/global split
         indiaSharePct?: number;
         pickedLangPct?: number;
+        minAndroidVersionCode?: number;
       }
     | null
     | undefined;
@@ -1729,8 +1730,8 @@ function Shell() {
         />
       )}
 
-      {/* over-the-air update: slides in when a bundle has downloaded */}
-      <UpdateBanner />
+      {/* updates: an over-the-air bundle ready to apply, or a newer build on Google Play */}
+      <UpdateBanner minVersionCode={runtimeCfg?.minAndroidVersionCode ?? 0} />
 
       {saveSheetOpen && (
         <SaveTargetSheet
