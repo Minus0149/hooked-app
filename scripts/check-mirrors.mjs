@@ -48,6 +48,8 @@ const MODULES = [
   "lib/playlistExport.ts",
   "lib/hookOfDay.ts",
   "lib/i18n.ts",
+  "lib/insightContext.ts",
+  "lib/features.ts",
 ];
 
 try {

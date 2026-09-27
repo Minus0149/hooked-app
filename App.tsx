@@ -62,7 +62,7 @@ import { StoreProvider, useStore } from "./src/state/store";
 import { enqueue, flush } from "./src/lib/outbox";
 import { SwipeDeck } from "./src/components/SwipeDeck";
 import { hooksOf, sourceOf, windowTiming } from "./src/lib/hooks";
-import { HomeScreen } from "./src/components/HomeScreen";
+import { HomeScreen, type LiveDeck } from "./src/components/HomeScreen";
 import { LibraryScreen } from "./src/components/LibraryScreen";
 import { SettingsScreen } from "./src/components/SettingsScreen";
 import { StatsScreen } from "./src/components/StatsScreen";
@@ -92,6 +92,8 @@ import {
   onHookNotificationTap,
   scheduleHookNotifications,
 } from "./src/lib/hookOfDayNotify";
+import { insightContext } from "./src/lib/insightContext";
+import { DECK_PLAYS_PER_SESSION, deckTracks } from "./src/lib/features";
 import {
   DIR_TO_ACTION,
   type LibraryContainer,
@@ -800,7 +802,14 @@ function Shell() {
   const pendingPromo = useRef<Track | null>(null);
   const promoPick = useQuery(
     anyApi.promotions.nextPromoted,
-    promoDue ? { anonKey: anonKeyRef.current ?? undefined } : "skip",
+    promoDue
+      ? {
+          anonKey: anonKeyRef.current ?? undefined,
+          // targeted campaigns go to listeners who fit (same as web)
+          mood: state.mood,
+          genres: [...state.taste.genres, ...state.boostGenres],
+        }
+      : "skip",
   ) as
     | { campaignId: string; everyNCards: number; track: ServerCatalogTrack }
     | null
@@ -883,6 +892,10 @@ function Shell() {
   const [hookIndex, setHookIndex] = useState(0);
   const hookIndexRef = useRef(0);
   hookIndexRef.current = hookIndex;
+  const currentTimeRef = useRef(0);
+  currentTimeRef.current = status.currentTime;
+  const moodRef = useRef(state.mood);
+  moodRef.current = state.mood;
   const hooksRef = useRef(hooks);
   hooksRef.current = hooks;
   // a seek issued before the source is loaded is dropped, so it waits here
@@ -991,6 +1004,14 @@ function Shell() {
       lastSwipeAt.current = Date.now();
       noteSwipeForAds();
       noteSwipeForPromoted();
+      // a play inside a sponsored deck, while its mood is still on (counts only)
+      const ds = deckSession.current;
+      if (ds && (ds.mood === null || ds.mood === moodRef.current) && ds.plays < DECK_PLAYS_PER_SESSION) {
+        ds.plays += 1;
+        deckEventRef.current(ds.id, "play");
+      } else if (ds) {
+        deckSession.current = null;
+      }
       const track = onDeck;
       const action = DIR_TO_ACTION[dir];
       if (track?.promotedCampaignId) {
@@ -1010,7 +1031,17 @@ function Shell() {
           playing && /^[a-z0-9]{20,}$/.test(playing.id) ? playing.id : undefined;
         syncWrite(
           "recordSwipe",
-          { track: toServer(track), action, ...(hookId ? { hookId } : {}) },
+          {
+            track: toServer(track),
+            action,
+            ...(hookId ? { hookId } : {}),
+            // for the artist's free insights: where in the hook, and in what mood
+            ...insightContext(
+              playing?.durationMs,
+              playing ? (currentTimeRef.current * 1000 - playing.startMs) / playing.durationMs : Number.NaN,
+              moodRef.current,
+            ),
+          },
           recordSwipeMutation,
         );
       }
@@ -1131,6 +1162,52 @@ function Shell() {
     }, 1500);
     return () => clearTimeout(id);
   }, [state.hydrated, hotdSettings, tx]);
+
+  // ----- Home: indie hook of the week, sponsored decks (src/lib/features.ts) -----
+  const featured = useQuery(anyApi.featured.current) as
+    | { week: string; blurb: string; track: ServerCatalogTrack }
+    | null
+    | undefined;
+  const liveDecks = useQuery(anyApi.sponsoredDecks.live) as LiveDeck[] | undefined;
+  const recordDeck = useMutation(anyApi.sponsoredDecks.record);
+  const deckSession = useRef<{ id: string; mood: string | null; plays: number } | null>(null);
+  const deckSeen = useRef(new Set<string>());
+  const deckEvent = useCallback(
+    (deckId: string, event: "impression" | "open" | "play") =>
+      void recordDeck({ deckId, event, anonKey: anonKeyRef.current ?? undefined }).catch(() => undefined),
+    [recordDeck],
+  );
+  // the swipe handler is declared above this and reads the latest one through a ref
+  const deckEventRef = useRef(deckEvent);
+  deckEventRef.current = deckEvent;
+  useEffect(() => {
+    if (screen !== "home" || !liveDecks) return;
+    for (const d of liveDecks) {
+      if (deckSeen.current.has(d.id)) continue;
+      deckSeen.current.add(d.id);
+      deckEvent(d.id, "impression");
+    }
+  }, [screen, liveDecks, deckEvent]);
+  const playFeatured = useCallback(
+    (track: Track) => {
+      if (state.catalog.some((t) => t.id === track.id) || state.queue.some((t) => t.id === track.id)) jumpTo(track.id);
+      else injectNext(track);
+      switchTab("discover");
+    },
+    [state.catalog, state.queue, jumpTo, injectNext, switchTab],
+  );
+  const openDeck = useCallback(
+    (deck: LiveDeck) => {
+      deckEvent(deck.id, "open");
+      deckSession.current = { id: deck.id, mood: deck.mood, plays: 0 };
+      if (deck.mood) setMood(deck.mood as MoodId);
+      const first = deckTracks(state.catalog, deck);
+      for (const t of [...first].reverse().slice(0, -1)) injectNext(t);
+      if (first[0]) jumpTo(first[0].id);
+      switchTab("discover");
+    },
+    [deckEvent, setMood, state.catalog, injectNext, jumpTo, switchTab],
+  );
 
   const handleCreatePlaylist = useCallback(
     async (
@@ -1400,6 +1477,10 @@ function Shell() {
           </View>
           <HomeScreen
             accent={accent}
+            featured={featured ? { blurb: featured.blurb, track: toLocalCatalog(featured.track) } : null}
+            onPlayFeatured={playFeatured}
+            decks={liveDecks ?? []}
+            onOpenDeck={openDeck}
             onDiscover={goDiscover}
             onOpenLibrary={(c) => push(`library:${c}`)}
             onNewPlaylist={() => setNewPlaylistOpen(true)}

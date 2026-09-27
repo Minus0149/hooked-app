@@ -16,8 +16,22 @@ import { Eq } from "./Eq";
 import { Face } from "./faces";
 import { RecapCard } from "./RecapCard";
 import { inkOn } from "../lib/contrast";
-import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodsForHour } from "../data/mood";
 import { useLang, useT } from "../lib/lang";
+import { DAYPART_COPY, DAYPART_MOOD, daypartAt, moodById, moodsForHour, type MoodId } from "../data/mood";
+import { FEATURED_LABEL, SPONSORED_TAG, deckLabel } from "../lib/features";
+
+/** This week's indie hook, as Home shows it (convex/featured.ts: current). */
+export type FeaturedPick = { blurb: string; track: Track };
+/** A sponsored deck live now (convex/sponsoredDecks.ts: live). */
+export type LiveDeck = {
+  id: string;
+  brand: string;
+  logoUrl: string | null;
+  title: string;
+  mood: string | null;
+  genre: string | null;
+  trackIds: string[];
+};
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -109,6 +123,10 @@ export function HomeScreen({
   onNewPlaylist,
   hookOfDay,
   onPlayHookOfDay,
+  featured = null,
+  onPlayFeatured,
+  decks = [],
+  onOpenDeck,
 }: {
   accent: string;
   onDiscover: (trackId?: string) => void;
@@ -117,6 +135,10 @@ export function HomeScreen({
   /** today's pick, or null when hidden in Settings / nothing to pick */
   hookOfDay?: Track | null;
   onPlayHookOfDay?: (t: Track) => void;
+  featured?: FeaturedPick | null;
+  onPlayFeatured?: (track: Track) => void;
+  decks?: LiveDeck[];
+  onOpenDeck?: (deck: LiveDeck) => void;
 }) {
   const { lang, t } = useLang();
   const { state, setMood } = useStore();
@@ -188,6 +210,27 @@ export function HomeScreen({
       <Text style={styles.title}>
         {t("what's your next")} <Text style={{ color: accent }}>{t("obsession?")}</Text>
       </Text>
+
+      {featured ? (
+        // unpaid and chosen by us, so it's labelled as a pick, never "promoted" (as on web)
+        <Pressable
+          style={({ pressed }) => [styles.featured, pressed && styles.pressed]}
+          onPress={() => onPlayFeatured?.(featured.track)}
+          accessibilityRole="button"
+          accessibilityLabel={`${FEATURED_LABEL}: ${featured.track.title} by ${featured.track.artist}. Play it.`}
+        >
+          <Image source={{ uri: art(featured.track.artwork, 300) }} style={styles.featuredArt} />
+          <View style={styles.featuredText}>
+            <Text style={styles.featuredKicker}>{FEATURED_LABEL.toUpperCase()}</Text>
+            <Text style={styles.featuredTitle} numberOfLines={1}>{featured.track.title}</Text>
+            <Text style={styles.featuredArtist} numberOfLines={1}>{featured.track.artist}</Text>
+            <Text style={styles.featuredBlurb} numberOfLines={2}>{featured.blurb}</Text>
+          </View>
+          <View style={styles.featuredPlay}>
+            <Feather name="play" size={16} color={colors.ink} />
+          </View>
+        </Pressable>
+      ) : null}
 
       <Pressable
         style={({ pressed }) => [
@@ -286,6 +329,36 @@ export function HomeScreen({
       {state.prefs.moodByTime !== "off" ? (
         <Text style={styles.moodNudge}>{t(DAYPART_COPY[hour.part].nudge)}</Text>
       ) : null}
+      {decks.map((d) => {
+        const mood = d.mood ? moodById(d.mood as MoodId) : null;
+        const tint = mood?.accent ?? accent;
+        return (
+          // a brand paid for this deck: it says so, on the card itself (ASCI), as on web
+          <Pressable
+            key={d.id}
+            style={({ pressed }) => [
+              styles.deck,
+              { borderColor: mixHex(tint, colors.line, 0.55), backgroundColor: mixHex(tint, colors.surface, 0.12) },
+              pressed && styles.pressed,
+            ]}
+            onPress={() => onOpenDeck?.(d)}
+            accessibilityRole="button"
+            accessibilityLabel={`${deckLabel(d)}. ${SPONSORED_TAG}.`}
+          >
+            {d.logoUrl ? (
+              <Image source={{ uri: d.logoUrl }} style={styles.deckLogo} />
+            ) : mood ? (
+              <View style={styles.moodDisc}>
+                <Face mood={mood.id} size={26} cut={colors.surface} color={mood.accent} />
+              </View>
+            ) : null}
+            <View style={styles.deckText}>
+              <Text style={styles.deckTitle} numberOfLines={2}>{deckLabel(d)}</Text>
+              <Text style={styles.deckTag}>{SPONSORED_TAG.toUpperCase()}</Text>
+            </View>
+          </Pressable>
+        );
+      })}
 
       <RecapCard />
 
@@ -434,6 +507,58 @@ const styles = StyleSheet.create({
   hotdTitle: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.text, marginTop: 2 },
   hotdArtist: { fontFamily: fonts.bodyMedium, fontSize: 12.5, color: colors.muted, marginTop: 2 },
   hotdPlay: { width: 40, height: 40, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  // indie hook of the week (src/lib/features.ts)
+  featured: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: mixHex(colors.save, colors.surface, 0.14),
+  },
+  featuredArt: { width: 72, height: 72, borderRadius: 14 },
+  featuredText: { flex: 1, minWidth: 0, gap: 2 },
+  featuredKicker: { color: colors.save, fontFamily: fonts.bodyBold, fontSize: 10.5, letterSpacing: 1.5 },
+  featuredTitle: { color: colors.text, fontFamily: fonts.displayBold, fontSize: 16 },
+  featuredArtist: { color: colors.muted, fontFamily: fonts.body, fontSize: 13 },
+  featuredBlurb: { color: colors.text, opacity: 0.85, fontFamily: fonts.body, fontSize: 12.5 },
+  featuredPlay: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.text,
+  },
+  // sponsored mood decks
+  deck: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  deckLogo: { width: 34, height: 34, borderRadius: 8, backgroundColor: "#fff" },
+  deckText: { flex: 1, minWidth: 0, gap: 3 },
+  deckTitle: { color: colors.text, fontFamily: fonts.bodyBold, fontSize: 14 },
+  deckTag: {
+    alignSelf: "flex-start",
+    color: colors.muted,
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
   scroll: { flex: 1 },
   // extra bottom padding so content never scrolls under the protruding nav FAB
   content: { paddingHorizontal: 20, paddingBottom: 38 },
