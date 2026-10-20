@@ -38,6 +38,8 @@ const MODULES = [
   "lib/tourCopy.ts",
   "lib/volume.ts",
   "lib/authForms.ts",
+  "lib/username.ts",
+  "lib/songSearch.ts",
   "lib/contentReport.ts",
   "lib/backdrop.ts",
   "lib/attribution.ts",

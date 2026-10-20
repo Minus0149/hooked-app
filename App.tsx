@@ -74,6 +74,7 @@ import { DataPage } from "./src/components/settings/DataPage";
 import { LanguagePage } from "./src/components/settings/LanguagePage";
 import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { ProfileScreen } from "./src/components/ProfileScreen";
+import { SearchScreen } from "./src/components/SearchScreen";
 import { Onboarding } from "./src/components/Onboarding";
 import { BottomNav } from "./src/components/BottomNav";
 import { SaveTargetSheet } from "./src/components/SaveTargetSheet";
@@ -120,6 +121,7 @@ type Screen =
   | "home"
   | "discover"
   | "profile"
+  | "search"
   | "settings"
   | "stats"
   | `library:${string}`
@@ -1502,6 +1504,7 @@ function Shell() {
             onNewPlaylist={() => setNewPlaylistOpen(true)}
             hookOfDay={hotdSettings.showOnHome ? hookOfDay : null}
             onPlayHookOfDay={(t) => goDiscover(t.id)}
+            onSearch={() => push("search")}
           />
         </>
       )}
@@ -1614,6 +1617,8 @@ function Shell() {
           )}
         </>
       )}
+
+      {screen === "search" && <SearchScreen accent={accent} onBack={pop} onPlay={playFeatured} />}
 
       {screen === "profile" && (
         <ProfileScreen

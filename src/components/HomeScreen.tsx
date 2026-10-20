@@ -123,6 +123,7 @@ export function HomeScreen({
   onNewPlaylist,
   hookOfDay,
   onPlayHookOfDay,
+  onSearch,
   featured = null,
   onPlayFeatured,
   decks = [],
@@ -135,6 +136,8 @@ export function HomeScreen({
   /** today's pick, or null when hidden in Settings / nothing to pick */
   hookOfDay?: Track | null;
   onPlayHookOfDay?: (t: Track) => void;
+  /** opens song search (SearchScreen) */
+  onSearch?: () => void;
   featured?: FeaturedPick | null;
   onPlayFeatured?: (track: Track) => void;
   decks?: LiveDeck[];
@@ -210,6 +213,18 @@ export function HomeScreen({
       <Text style={styles.title}>
         {t("what's your next")} <Text style={{ color: accent }}>{t("obsession?")}</Text>
       </Text>
+
+      {onSearch && (
+        <Pressable
+          onPress={onSearch}
+          style={({ pressed }) => [styles.search, pressed && { transform: [{ scale: 0.98 }] }]}
+          accessibilityRole="button"
+          accessibilityLabel={t("Search songs")}
+        >
+          <Feather name="search" size={17} color={colors.muted} />
+          <Text style={styles.searchText}>{t("Search songs, artists, albums")}</Text>
+        </Pressable>
+      )}
 
       {featured ? (
         // unpaid and chosen by us, so it's labelled as a pick, never "promoted" (as on web)
@@ -583,6 +598,20 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 20,
   },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: -6,
+    marginBottom: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  searchText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.muted },
   cta: {
     flexDirection: "row",
     alignItems: "center",

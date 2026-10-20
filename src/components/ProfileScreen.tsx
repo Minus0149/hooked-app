@@ -16,6 +16,7 @@ import { art } from "../lib/art";
 import { AuthForm } from "./AuthForm";
 import { AccessGate } from "./AccessGate";
 import { InviteCard } from "./InviteCard";
+import { UsernameField } from "./UsernameField";
 
 import { useT } from "../lib/lang";
 const ENTER = (i: number) => FadeInDown.duration(320).delay(i * 70);
@@ -111,6 +112,7 @@ export function ProfileScreen({
               </Text>
             </View>
             <Text style={styles.heroEmail}>{email}</Text>
+            <UsernameField accent={accent} />
             <View style={styles.heroSubRow}>
               <Feather name="check" size={13} color={colors.save} />
               <Text style={styles.heroSub}>
