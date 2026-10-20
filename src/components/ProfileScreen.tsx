@@ -99,6 +99,9 @@ export function ProfileScreen({
           style={{ flex: 1 }}
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
+          // the username field's Save sits in here: without this the first tap
+          // only closes the keyboard and Save needs a second one
+          keyboardShouldPersistTaps="handled"
         >
           <Animated.View entering={ENTER(0)} style={styles.hero}>
             <View
