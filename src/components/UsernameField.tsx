@@ -5,6 +5,7 @@ import { anyApi } from "convex/server";
 import { colors, fonts, radii } from "../design/tokens";
 import { normalizeUsername, usernameProblem, USERNAME_MAX } from "../lib/username";
 import { useT } from "../lib/lang";
+import { serverMessage } from "../lib/serverError";
 
 /**
  * The listener's @handle on their profile: shown when set, edited in place.
@@ -70,8 +71,8 @@ export function UsernameField({ accent }: { accent: string }) {
       await save({ username: name });
       setEditing(false);
     } catch (e) {
-      const raw = e instanceof Error ? e.message : String(e);
-      setError(/Uncaught Error: (.+?)(\n|$)/.exec(raw)?.[1] ?? tt("Couldn't save that. Try again."));
+      // Convex wraps thrown messages (and prod redacts all but ConvexError); show only ours
+      setError(serverMessage(e, tt("Couldn't save that. Try again.")));
     } finally {
       setBusy(false);
     }

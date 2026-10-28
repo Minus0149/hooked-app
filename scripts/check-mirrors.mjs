@@ -53,6 +53,7 @@ const MODULES = [
   "lib/insightContext.ts",
   "lib/features.ts",
   "lib/hookPlayback.ts",
+  "lib/serverError.ts",
 ];
 
 try {

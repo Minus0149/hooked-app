@@ -15,6 +15,7 @@ import {
 } from "../lib/contentReport";
 
 import { useT } from "../lib/lang";
+import { serverMessage } from "../lib/serverError";
 /**
  * "Report this song", inside the full-song sheet (Google Play's UGC policy) —
  * the web's ReportSong, same words and order (lib/contentReport.ts). Works
@@ -58,7 +59,7 @@ export function ReportSong({
       });
       setSent(true);
     } catch (err) {
-      const m = err instanceof Error ? err.message : "";
+      const m = serverMessage(err, "");
       setError(/rate|too many|slow down/i.test(m) ? "That's a lot of reports — try again in a while." : "Couldn't send that report. Try again?");
     } finally {
       setBusy(false);

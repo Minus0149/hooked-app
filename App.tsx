@@ -108,6 +108,7 @@ import { BlurTarget } from "./src/components/Backdrop";
 import { CONVEX_URL, SITE_URL, WEB_APP_URL } from "./src/config/env";
 import { useCatalog } from "./src/lib/useCatalog";
 import type { CatalogTrack } from "./src/lib/catalogCodec";
+import { serverMessage } from "./src/lib/serverError";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
 const ANON_SWIPES_KEY = "hooked.anonSwipes.v1";
@@ -557,7 +558,8 @@ function Shell() {
     void ensureProfile({})
       .then(() => setAccessState("ok"))
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
+        // prod redacts the message text to "Server Error"; the code rides in ConvexError .data
+        const message = serverMessage(err, "");
         if (message.includes("ACCESS_PENDING")) setAccessState("pending");
         else if (message.includes("ACCESS_REJECTED")) setAccessState("rejected");
         else if (message.includes("ACCESS_NOT_REQUESTED")) setAccessState("none");
@@ -585,7 +587,7 @@ function Shell() {
         await deleteAccountMutation(DELETE_ACCOUNT_ARGS);
       } catch (err) {
         notify(
-          `Could not delete the account — ${err instanceof Error ? err.message : "try again in a moment"}`,
+          `Could not delete the account — ${serverMessage(err, "try again in a moment")}`,
           "error",
         );
         return;
