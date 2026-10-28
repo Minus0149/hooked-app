@@ -61,7 +61,7 @@ import { authClient } from "./src/lib/auth-client";
 import { StoreProvider, useStore } from "./src/state/store";
 import { enqueue, flush } from "./src/lib/outbox";
 import { SwipeDeck } from "./src/components/SwipeDeck";
-import { hooksOf, sourceOf, windowTiming } from "./src/lib/hooks";
+import { FADE_TICK_MS, hooksOf, sourceOf, windowTiming, windowVolume } from "./src/lib/hooks";
 import { HomeScreen, type LiveDeck } from "./src/components/HomeScreen";
 import { LibraryScreen } from "./src/components/LibraryScreen";
 import { SettingsScreen } from "./src/components/SettingsScreen";
@@ -886,6 +886,9 @@ function Shell() {
 
   // device-local volume: hardware differs, so this never syncs to the profile
   const [volume, setVolumeState] = useState(1);
+  // the fade loop below reads these between renders
+  const volumeRef = useRef(1);
+  volumeRef.current = volume;
   useEffect(() => {
     // nothing saved on a fresh install must mean full volume, not muted
     void AsyncStorage.getItem(VOLUME_KEY).then((v) => {
@@ -926,6 +929,9 @@ function Shell() {
       setHookIndex(0);
       hookIndexRef.current = 0;
       player.replace({ uri: sourceOf(onDeck) });
+      // silent until the fade loop lifts it: the file starts at 0 and the
+      // seek to the hook lands a moment later, and a hook fades in anyway
+      player.volume = 0;
       const first = hooksRef.current[0];
       pendingSeekRef.current = first.startMs > 0 ? first.startMs / 1000 : null;
       player.play();
@@ -933,6 +939,39 @@ function Shell() {
       player.pause();
     }
   }, [inDiscover, onDeck?.id]);
+
+  /**
+   * Hooks fade in over 0.12 s and out over their last 0.5 s (hookGain, shared
+   * with the web player), so a hook ends gently on its line instead of
+   * stopping dead. Runs on a short timer while Discover is up: status events
+   * come every 250 ms, too coarse for a half-second fade. Each status event
+   * applies it too, because JS timers pause while the app is in the
+   * background and the music doesn't. The listener's volume stays the
+   * ceiling; with Auto-advance off the last window only fades in, because
+   * the song plays on past it.
+   */
+  const autoAdvanceRef = useRef(state.autoAdvance);
+  autoAdvanceRef.current = state.autoAdvance;
+  const applyFade = useCallback(() => {
+    const list = hooksRef.current;
+    const i = hookIndexRef.current;
+    const hook = list[i] ?? list[0];
+    if (!hook) return;
+    const endsHere = autoAdvanceRef.current || i < list.length - 1;
+    player.volume = windowVolume(hook, player.currentTime, player.duration, volumeRef.current, endsHere);
+  }, [player]);
+  useEffect(() => {
+    if (!inDiscover) return;
+    applyFade();
+    const id = setInterval(applyFade, FADE_TICK_MS);
+    return () => {
+      clearInterval(id);
+      player.volume = volumeRef.current;
+    };
+  }, [inDiscover, player, applyFade]);
+  useEffect(() => {
+    if (inDiscover) applyFade();
+  }, [status.currentTime, inDiscover, applyFade]);
 
   // the deferred seek, once there is something to seek in
   useEffect(() => {
