@@ -53,7 +53,10 @@ it has already seen, so bump it for every upload. `eas.json` sets
 `appVersionSource: remote`, which only applies to EAS builds — a local build uses
 whatever is in `app.json`.
 
-Current: `1.0.3`, versionCode `4`, package `com.minus.hookedcue`, targetSdk 36.
+Current: `1.0.3`, versionCode `6`, package `com.minus.hookedcue`, targetSdk 36.
+versionCode 5 (2026-09-28) and 6 (2026-10-28) kept `1.0.3`: neither added native code, so the
+OTA runtime (`runtimeVersion.policy: appVersion`) is unchanged and 1.0.3 OTA updates reach both.
+Bump `version` only when a native module is added or removed.
 `1.0.2` / versionCode 3 is the first closed-test release (in review 2026-09-27). 1.0.3 adds a
 native module (expo-notifications), so its runtime version differs: never publish an OTA built
 from 1.0.3 code to the 1.0.2 channel, and never bump back.
