@@ -12,6 +12,7 @@ import { useStore } from "../state/store";
 import type { LibraryContainer, Track } from "../types";
 import { colors, fonts, mixHex, radii } from "../design/tokens";
 import { art } from "../lib/art";
+import { becauseRows as becauseRowsFor } from "../lib/homeRows";
 import { Eq } from "./Eq";
 import { Face } from "./faces";
 import { RecapCard } from "./RecapCard";
@@ -163,38 +164,25 @@ export function HomeScreen({
 
   const fresh = useMemo(() => queue.slice(0, 10), [queue]);
 
-  // parity with web: the right-swipe steer surfaces as its own row, deduped
-  // by normalized title+artist and never repeating what the queue already
-  // shows below it
-  const becauseRows = useMemo(() => {
-    const norm = (t: Track) =>
-      `${t.title}·${t.artist}`.toLowerCase().replace(/\(.*?\)/g, "").trim();
-    const queueIds = new Set(queue.map((t) => t.id));
-    const genres =
-      boostGenres.length > 0
-        ? boostGenres
-        : [...new Set(liked.map((t) => t.genre))].slice(0, 2);
-    return genres
-      .map((genre) => {
-        const seen = new Set<string>();
-        const tracks = catalog
-          .filter(
-            (t) =>
-              t.genre === genre &&
-              !liked.some((l) => l.id === t.id) &&
-              !queueIds.has(t.id),
-          )
-          .filter((t) => {
-            const key = norm(t);
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          })
-          .slice(0, 8);
-        return { genre, tracks };
-      })
-      .filter((r) => r.tracks.length > 0);
-  }, [boostGenres, liked, catalog, queue]);
+  // parity with web: the right-swipe steer surfaces as its own row, and the
+  // deck's promises hold on Home too: no blocked artist, no buried song (or its
+  // twin under another id), nothing already kept (lib/homeRows.ts)
+  const becauseRows = useMemo(
+    () =>
+      becauseRowsFor({
+        catalog,
+        boostGenres,
+        liked,
+        discoveries,
+        playlists,
+        queue,
+        neverArtists: state.neverArtists,
+        neverTracks: state.neverTracks,
+        includeBuried: state.prefs.includeBuried,
+        includeBlockedArtists: state.prefs.includeBlockedArtists,
+      }),
+    [boostGenres, liked, discoveries, playlists, catalog, queue, state.neverArtists, state.neverTracks, state.prefs.includeBuried, state.prefs.includeBlockedArtists],
+  );
 
 
   // All seven choices fit in one row. It used to scroll sideways, which hid

@@ -54,6 +54,7 @@ const MODULES = [
   "lib/features.ts",
   "lib/hookPlayback.ts",
   "lib/serverError.ts",
+  "lib/homeRows.ts",
 ];
 
 try {
