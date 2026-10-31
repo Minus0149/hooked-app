@@ -21,6 +21,7 @@ import { useDialogs } from "./Dialogs";
 import { moodById } from "../data/mood";
 import { useT } from "../lib/lang";
 import { ExportSheet } from "./ExportSheet";
+import { PlaylistPeople } from "./People";
 
 function totalMinutes(tracks: Track[]) {
   // previews are ~30s each; show the full-song runtime for flavor
@@ -279,6 +280,9 @@ export function LibraryScreen({
           <Text style={[styles.ctaText, { color: colors.text }]}>{tx("Export")}</Text>
         </Pressable>
       </View>
+
+      {/* a shared playlist's people: remove a member, block someone */}
+      {playlistId && <PlaylistPeople playlistId={playlistId} accent={accent} />}
 
       {playlistId && rules && (
         <>

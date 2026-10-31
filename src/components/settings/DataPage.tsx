@@ -6,6 +6,7 @@ import { useStore } from "../../state/store";
 import { colors, fonts } from "../../design/tokens";
 import { APPLE_CREDIT_NOTE } from "../../lib/attribution";
 import { SITE_URL, WEB_APP_URL } from "../../config/env";
+import { BlockedPeople } from "../People";
 
 /**
  * Settings → Data & privacy.
@@ -116,6 +117,8 @@ export function DataPage({
           if (ok) onResetData();
         }}
       />
+      {/* people you blocked, with the way back (web: convex/social.ts block) */}
+      {signedIn && <BlockedPeople />}
       {signedIn && (
         <Row
           glyph="✕"

@@ -55,6 +55,8 @@ const MODULES = [
   "lib/hookPlayback.ts",
   "lib/serverError.ts",
   "lib/homeRows.ts",
+  "lib/skipStreak.ts",
+  "lib/crowdReveal.ts",
 ];
 
 try {

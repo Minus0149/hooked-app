@@ -109,6 +109,11 @@ import { CONVEX_URL, SITE_URL, WEB_APP_URL } from "./src/config/env";
 import { useCatalog } from "./src/lib/useCatalog";
 import type { CatalogTrack } from "./src/lib/catalogCodec";
 import { serverMessage } from "./src/lib/serverError";
+import { droppedShared } from "./src/lib/sharedPlaylists";
+import { offerReset, trailingSkips } from "./src/lib/skipStreak";
+import { SkipStreakPrompt } from "./src/components/SkipStreakPrompt";
+import { CrowdReveal } from "./src/components/CrowdReveal";
+import { crowdReveal, nextStreak, verdictOf, type CrowdStats, type Reveal } from "./src/lib/crowdReveal";
 
 const ONBOARD_KEY = "hooked.onboarded.v1";
 const ANON_SWIPES_KEY = "hooked.anonSwipes.v1";
@@ -153,6 +158,8 @@ interface ServerLibrary {
     includeBuried?: boolean;
     includeBlockedArtists?: boolean;
     mood?: string | null;
+    /** whose playlist it is, when it isn't this listener's own (a shared one they joined) */
+    sharedBy?: string | null;
     songs: ServerTrack[];
   }[];
   neverArtists: string[];
@@ -234,6 +241,7 @@ function Shell() {
     applyCatalog,
     applyAffinity,
     setMood,
+    freshSuggestions,
     applyCrowdMoods,
     applyMoodPicks,
     setStrengths,
@@ -694,6 +702,23 @@ function Shell() {
     }
   }, [library, sessionUid, hydrateRemote]);
 
+  // A shared playlist this listener was taken out of (the owner removed them,
+  // turned off both Public and Collaborative, or a block ended it) leaves the
+  // phone too. Hydration above runs once per sign-in, so without this the
+  // playlist, and swipe-downs aimed at it, stayed until the next one. Only
+  // playlists the server listed as someone else's are touched: one this device
+  // made and hasn't synced yet is never in that set.
+  const joinedOnServer = useRef<{ uid: string; ids: Set<string> } | null>(null);
+  useEffect(() => {
+    if (!library || !sessionUid) return;
+    const listed = new Set(library.playlists.map((p) => String(p.id)));
+    const joined = new Set(library.playlists.filter((p) => p.sharedBy).map((p) => String(p.id)));
+    const before = joinedOnServer.current?.uid === sessionUid ? joinedOnServer.current.ids : null;
+    joinedOnServer.current = { uid: sessionUid, ids: joined };
+    if (!before) return;
+    for (const id of droppedShared(before, listed)) deletePlaylist(id); // local only: it's theirs, not ours
+  }, [library, sessionUid, deletePlaylist]);
+
   /** Push pref changes to the profile, debounced so slider drags don't spam. */
   const prefsTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const handleSetPrefs = useCallback(
@@ -864,6 +889,30 @@ function Shell() {
   }, [state.queue, injectNext]);
 
   const onDeck = state.queue[0] ?? null;
+
+  // "not feeling these?" after a run of skips; any answer quiets it until the
+  // next full run (web/src/App.tsx, lib/skipStreak.ts)
+  const skipRun = trailingSkips(state.history);
+  const [skipQuietAt, setSkipQuietAt] = useState(0);
+  const showSkipPrompt = !state.session && offerReset(skipRun, skipQuietAt);
+  // a save or a right-swipe ends the run, and with it the quiet
+  useEffect(() => {
+    if (skipRun < skipQuietAt) setSkipQuietAt(0);
+  }, [skipRun, skipQuietAt]);
+
+  // the crowd reveal: how everyone else judged the song on screen, fetched
+  // while it plays so the answer is ready the instant it's swiped
+  const deckCrowd = useQuery(anyApi.verdicts.forTrack, onDeck ? { trackId: onDeck.id } : "skip") as
+    | CrowdStats
+    | undefined;
+  const crowdCache = useRef<{ id: string; stats: CrowdStats } | null>(null);
+  useEffect(() => {
+    if (onDeck && deckCrowd) crowdCache.current = { id: onDeck.id, stats: deckCrowd };
+  }, [onDeck, deckCrowd]);
+  const [crowd, setCrowd] = useState<{ key: number; reveal: Reveal; title: string; streak: number } | null>(null);
+  const crowdStreak = useRef(0);
+  const crowdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(crowdTimer.current), []);
   const previousEntry = state.history.length
     ? state.history[state.history.length - 1]
     : null;
@@ -1080,6 +1129,16 @@ function Shell() {
           event: promotedOutcome(dir),
         }).catch(() => undefined);
       }
+      // up/down are verdicts; a playlist being played is "next", not a verdict
+      const verdict = dir === "up" || dir === "down" ? verdictOf(action) : null;
+      if (track && verdict && !state.session) {
+        const stats = crowdCache.current?.id === track.id ? crowdCache.current.stats : null;
+        const reveal = crowdReveal(stats, verdict);
+        crowdStreak.current = nextStreak(crowdStreak.current, reveal);
+        clearTimeout(crowdTimer.current);
+        setCrowd({ key: Date.now(), reveal, title: track.title, streak: crowdStreak.current });
+        crowdTimer.current = setTimeout(() => setCrowd(null), 2600);
+      }
       swipe(action);
       if (signedIn && track) {
         // credit the playing hook so save-rate ranking learns from mobile
@@ -1105,7 +1164,7 @@ function Shell() {
         );
       }
     },
-    [swipe, onDeck, signedIn, recordSwipeMutation, syncWrite, noteSwipeForAds, noteSwipeForPromoted, recordPromoted],
+    [swipe, onDeck, signedIn, recordSwipeMutation, syncWrite, noteSwipeForAds, noteSwipeForPromoted, recordPromoted, state.session],
   );
 
   // a promoted card counts as heard after 3 s of actual playing (as on web)
@@ -1654,6 +1713,31 @@ function Shell() {
                 closeActiveAd("click");
                 void Linking.openURL(activeAd.ctaUrl).catch(() => undefined);
               }}
+            />
+          )}
+          {showSkipPrompt && !activeAd && (
+            <SkipStreakPrompt
+              streak={skipRun}
+              accent={accent}
+              motion={state.prefs.motion}
+              onMood={(mood) => {
+                setSkipQuietAt(skipRun);
+                setMood(mood);
+              }}
+              onFresh={() => {
+                setSkipQuietAt(skipRun);
+                freshSuggestions();
+              }}
+              onDismiss={() => setSkipQuietAt(skipRun)}
+            />
+          )}
+          {crowd && (
+            <CrowdReveal
+              key={crowd.key}
+              reveal={crowd.reveal}
+              title={crowd.title}
+              streak={crowd.streak}
+              motion={state.prefs.motion}
             />
           )}
         </>
