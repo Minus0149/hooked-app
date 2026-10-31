@@ -7,6 +7,7 @@ import {
   AUTH_COPY,
   authProblem,
   friendlyAuthError,
+  inviteCodeProblem,
   isNotApproved,
   type AuthMode,
 } from "../lib/authForms";
@@ -19,7 +20,9 @@ import { useT } from "../lib/lang";
  *
  * HookedCue is a beta you apply for, so this leads with signing in. Creating
  * an account is for invited emails only: the server refuses anyone else and
- * the form turns that refusal into an Apply button. `compact` drops the
+ * the form turns that refusal into an Apply button. Creating one also needs
+ * the one-time code from the invite email, typed into the code box (the
+ * email's link opens the web app with it filled in). `compact` drops the
  * headline — the invite gate shows it under its own pitch.
  */
 export function AuthForm({
@@ -39,6 +42,7 @@ export function AuthForm({
   const tt = useT();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState(initialEmail);
+  const [inviteCode, setInviteCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +61,9 @@ export function AuthForm({
 
   const submit = async () => {
     if (busy) return;
-    const problem = authProblem(mode, email, password);
+    const problem =
+      authProblem(mode, email, password) ??
+      (mode === "join" ? inviteCodeProblem(inviteCode) : null);
     if (problem) {
       setError(problem);
       return;
@@ -77,6 +83,9 @@ export function AuthForm({
               name: email.trim().split("@")[0],
               // the confirmation link opens the web app; the phone rechecks on return
               callbackURL: WEB_APP_URL,
+              // checked by the server's sign-up hook (web/convex/auth.ts). Better
+              // Auth passes extra body fields through; its types don't list them.
+              ...({ inviteCode: inviteCode.trim() } as object),
             })
           : await authClient.signIn.email({ email: email.trim(), password });
     } catch (err) {
@@ -139,6 +148,25 @@ export function AuthForm({
           returnKeyType="next"
         />
       </View>
+
+      {mode === "join" && (
+        <View style={s.field}>
+          <Text style={s.label}>{tt(AUTH_COPY.codeLabel)}</Text>
+          <Input
+            placeholder={tt(AUTH_COPY.codePlaceholder)}
+            value={inviteCode}
+            onChangeText={setInviteCode}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            autoComplete="one-time-code"
+            maxLength={20}
+            returnKeyType="next"
+            accessibilityHint={tt(AUTH_COPY.codeHint)}
+            style={s.codeInput}
+          />
+          <Text style={s.hint}>{tt(AUTH_COPY.codeHint)}</Text>
+        </View>
+      )}
 
       <View style={s.field}>
         <View style={s.labelRow}>
@@ -315,6 +343,9 @@ const s = StyleSheet.create({
     color: colors.muted,
   },
   link: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.muted },
+  // the invite code, typed off an email letter by letter
+  codeInput: { letterSpacing: 2 },
+  hint: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, color: colors.muted },
   input: {
     width: "100%",
     minHeight: 50,
