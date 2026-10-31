@@ -53,7 +53,7 @@ it has already seen, so bump it for every upload. `eas.json` sets
 `appVersionSource: remote`, which only applies to EAS builds — a local build uses
 whatever is in `app.json`.
 
-Current: `1.0.3`, versionCode `7` (uploaded to closed testing 2026-10-31 with `node scripts/play-upload.mjs upload <aab> alpha`; v6 was never uploaded), package `com.minus.hookedcue`, targetSdk 36.
+Current: `1.0.3`, versionCode `8` (v7 and v8 uploaded to closed testing 2026-10-31 with `node scripts/play-upload.mjs upload <aab> alpha`; v6 was never uploaded), package `com.minus.hookedcue`, targetSdk 36.
 versionCode 5 (2026-09-28) and 6 (2026-10-28) kept `1.0.3`: neither added native code, so the
 OTA runtime (`runtimeVersion.policy: appVersion`) is unchanged and 1.0.3 OTA updates reach both.
 Bump `version` only when a native module is added or removed.

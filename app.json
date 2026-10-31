@@ -30,7 +30,7 @@
     },
     "android": {
       "package": "com.minus.hookedcue",
-      "versionCode": 7,
+      "versionCode": 8,
       "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#08080C",
