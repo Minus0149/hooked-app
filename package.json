@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@better-auth/expo": "^1.6.33",
-    "@convex-dev/better-auth": "^0.12.5",
+    "@better-auth/expo": "~1.7.18",
+    "@convex-dev/better-auth": "^0.13.0",
     "@expo-google-fonts/instrument-sans": "^0.4.2",
     "@expo-google-fonts/unbounded": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/slider": "5.2.0",
-    "better-auth": "~1.6.9",
+    "better-auth": "~1.7.18",
     "convex": "^1.41.0",
     "expo": "~56.0.9",
     "expo-application": "~56.0.3",
@@ -48,5 +48,9 @@
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check-mojibake.mjs && node scripts/check-api-paths.mjs && node scripts/check-mirrors.mjs && node scripts/check-backend.mjs && node scripts/check-no-native-dialogs.mjs && tsc --noEmit"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "expo-constants": "~56.0.27",
+    "expo-asset": "~56.0.25"
+  }
 }
